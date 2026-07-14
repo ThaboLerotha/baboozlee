@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Game Night Engine</title>
+
+    <link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+
+<div id="app">
+
+    <!-- ==========================================
+         HOME SCREEN
+    =========================================== -->
+
+    <section id="homeScreen" class="screen">
+
+        <h1>🎮 Game Night Engine</h1>
+
+        <p class="version">
+            Version 0.1 Alpha
+        </p>
+
+        <div class="menu">
+
+            <button id="newGameBtn">
+                New Game
+            </button>
+
+            <button id="loadGameBtn">
+                Load Game
+            </button>
+
+            <button id="settingsBtn">
+                Settings
+            </button>
+
+            <button id="statsBtn">
+                Statistics
+            </button>
+
+        </div>
+
+    </section>
+
+
+    <!-- ==========================================
+         SETUP SCREEN
+    =========================================== -->
+
+    <section id="setupScreen" class="screen hidden">
+
+        <h2>New Game</h2>
+
+        <label>
+
+            Choose Game
+
+            <select id="gameMode">
+
+                <option>Baamboozle</option>
+
+            </select>
+
+        </label>
+
+        <br><br>
+
+        <label>
+
+            Number of Players
+
+            <select id="playerCount">
+
+                <option>2</option>
+                <option>3</option>
+                <option selected>4</option>
+                <option>5</option>
+                <option>6</option>
+                <option>7</option>
+                <option>8</option>
+                <option>9</option>
+                <option>10</option>
+                <option>11</option>
+                <option>12</option>
+                <option>13</option>
+                <option>14</option>
+                <option>15</option>
+                <option>16</option>
+                <option>17</option>
+                <option>18</option>
+                <option>19</option>
+                <option>20</option>
+
+            </select>
+
+        </label>
+
+        <div id="playerInputs">
+
+        </div>
+
+        <button id="startGameBtn">
+            Start Game
+        </button>
+
+    </section>
+
+
+    <!-- ==========================================
+         GAME SCREEN
+    =========================================== -->
+
+    <section id="gameScreen" class="screen hidden">
+
+        <header>
+
+            <h2>
+                Baamboozle
+            </h2>
+
+            <div id="currentPlayer">
+
+            </div>
+
+        </header>
+
+        <main>
+
+            <div id="board">
+
+            </div>
+
+            <aside id="scoreboard">
+
+            </aside>
+
+        </main>
+
+    </section>
+
+</div>
+
+
+<!-- ==========================================
+     QUESTION POPUP
+=========================================== -->
+
+<!-- POPUP -->
+
+<div id="popup" class="hidden">
+
+    <div id="popupBox">
+
+        <div id="popupQuestion">
+
+        </div>
+
+        <div id="popupAnswer" class="hidden">
+
+        </div>
+        <div id="timerArea">
+
+            <div id="timerDisplay">
+
+                5
+
+            </div>
+
+            <button id="startTimerBtn">
+
+                Start Timer
+
+            </button>
+
+            <button id="muteBtn">
+
+                🔊 Sound ON
+
+            </button>
+
+        </div>
+
+        <div id="popupButtons">
+
+            <button id="revealAnswerBtn">
+
+                Reveal Answer
+
+            </button>
+
+            <button id="correctBtn"
+                    class="hidden">
+
+                Correct
+
+            </button>
+
+            <button id="wrongBtn"
+                    class="hidden">
+
+                Wrong
+
+            </button>
+
+            <button id="closeBtn">
+
+                Close
+
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- ==========================================
+     JAVASCRIPT
+=========================================== -->
+<!-- DATA -->
+<script src="js/data/questionDatabase.js"></script>
+<script src="js/data/eventDatabase.js"></script>
+
+<!-- MANAGERS -->
+<script src="js/managers/questionManager.js"></script>
+<script src="js/managers/eventManager.js"></script>
+<script src="js/managers/eventExecutor.js"></script>
+<script src="js/managers/boardGenerator.js"></script>
+<script src="js/managers/timer.js"></script>
+<script src="js/managers/score.js"></script>
+
+<!-- ENGINE -->
+<script src="js/engine/app.js"></script>
+
+<!-- GAME -->
+<script src="js/game/players.js"></script>
+<script src="js/game/board.js"></script>
+
+<!-- UI -->
+<script src="js/ui/popup.js"></script>
+<script src="js/ui/ui.js"></script>
+</body>
+</html>

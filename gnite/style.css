@@ -1,0 +1,544 @@
+/* ===========================================
+   GAME NIGHT ENGINE
+   Version 0.1 Alpha
+=========================================== */
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;
+}
+
+body{
+
+    background:#1d1f27;
+
+    color:white;
+
+    min-height:100vh;
+
+}
+
+#app{
+
+    width:100%;
+
+    min-height:100vh;
+
+}
+
+/* ===========================================
+   Screens
+=========================================== */
+
+.screen{
+
+    width:100%;
+
+    min-height:100vh;
+
+    display:flex;
+
+    flex-direction:column;
+
+    justify-content:center;
+
+    align-items:center;
+
+}
+
+.hidden{
+
+    display:none;
+
+}
+
+/* ===========================================
+   Home Screen
+=========================================== */
+
+#homeScreen h1{
+
+    font-size:60px;
+
+    margin-bottom:15px;
+
+}
+
+.version{
+
+    color:#bbbbbb;
+
+    margin-bottom:50px;
+
+}
+
+.menu{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:20px;
+
+}
+
+.menu button{
+
+    width:280px;
+
+    height:60px;
+
+    font-size:22px;
+
+    border:none;
+
+    border-radius:12px;
+
+    cursor:pointer;
+
+    background:#4CAF50;
+
+    color:white;
+
+    transition:.25s;
+
+}
+
+.menu button:hover{
+
+    transform:scale(1.05);
+
+    background:#66bb6a;
+
+}
+
+/* ===========================================
+   Setup Screen
+=========================================== */
+
+#setupScreen{
+
+    gap:20px;
+
+}
+
+#setupScreen h2{
+
+    font-size:42px;
+
+    margin-bottom:20px;
+
+}
+
+#setupScreen label{
+
+    font-size:20px;
+
+}
+
+select{
+
+    margin-top:8px;
+
+    padding:10px;
+
+    font-size:18px;
+
+}
+
+#playerInputs{
+
+    display:grid;
+
+    grid-template-columns:repeat(2,250px);
+
+    gap:15px;
+
+    margin-top:25px;
+
+}
+
+.playerName{
+
+    padding:12px;
+
+    font-size:18px;
+
+    border-radius:8px;
+
+    border:none;
+
+}
+
+#startGameBtn{
+
+    margin-top:35px;
+
+    width:250px;
+
+    height:55px;
+
+    border:none;
+
+    border-radius:10px;
+
+    background:#2196F3;
+
+    color:white;
+
+    font-size:20px;
+
+    cursor:pointer;
+
+    transition:.25s;
+
+}
+
+#startGameBtn:hover{
+
+    transform:scale(1.05);
+
+}
+
+/* ===========================================
+   Game Screen
+=========================================== */
+
+#gameScreen{
+
+    padding:25px;
+
+    justify-content:flex-start;
+
+}
+
+header{
+
+    width:100%;
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    margin-bottom:25px;
+
+}
+
+header h2{
+
+    font-size:38px;
+
+}
+
+#currentPlayer{
+
+    font-size:24px;
+
+    font-weight:bold;
+
+    color:#FFD54F;
+
+}
+
+main{
+
+    width:100%;
+
+    display:flex;
+
+    gap:30px;
+
+}
+
+/* ===========================================
+   Game Board
+=========================================== */
+
+#board{
+
+    flex:3;
+
+    display:grid;
+
+    grid-template-columns:repeat(6,1fr);
+
+    gap:12px;
+
+}
+
+.tile{
+
+    background:#1565C0;
+
+    border-radius:12px;
+
+    height:95px;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    font-size:28px;
+
+    font-weight:bold;
+
+    cursor:pointer;
+
+    transition:.25s;
+
+    user-select:none;
+
+}
+
+.tile:hover{
+
+    background:#1E88E5;
+
+    transform:scale(1.04);
+
+}
+
+.tile.used{
+
+    background:#444;
+
+    color:#777;
+
+    cursor:not-allowed;
+
+}
+
+/* ===========================================
+   Scoreboard
+=========================================== */
+
+#scoreboard{
+
+    flex:1;
+
+    background:#2b2e3b;
+
+    border-radius:15px;
+
+    padding:20px;
+
+    min-width:280px;
+
+}
+
+.scorePlayer{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    padding:10px 0;
+
+    border-bottom:1px solid rgba(255,255,255,.1);
+
+}
+
+.scorePlayer:last-child{
+
+    border-bottom:none;
+
+}
+
+.scoreName{
+
+    font-weight:bold;
+
+}
+
+.scorePoints{
+
+    color:#81C784;
+
+}
+
+/* ===========================================
+   Responsive
+=========================================== */
+
+@media(max-width:1000px){
+
+    main{
+
+        flex-direction:column;
+
+    }
+
+}
+
+/* ===========================================
+   POPUP
+=========================================== */
+
+#popup{
+
+    position:fixed;
+
+    top:0;
+    left:0;
+
+    width:100%;
+    height:100%;
+
+    background:rgba(0,0,0,.75);
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    z-index:9999;
+
+}
+
+#popup.hidden{
+
+    display:none;
+
+}
+
+.popupBox{
+
+    width:650px;
+
+    max-width:90%;
+
+    background:white;
+
+    color:black;
+
+    border-radius:18px;
+
+    padding:35px;
+
+    text-align:center;
+
+    box-shadow:0 15px 50px rgba(0,0,0,.5);
+
+}
+
+.popupBox h2{
+
+    margin-bottom:25px;
+
+}
+
+#popupQuestion{
+
+    font-size:22px;
+
+    line-height:1.6;
+
+    min-height:120px;
+
+}
+
+.popupButtons{
+
+    display:flex;
+
+    justify-content:center;
+
+    gap:25px;
+
+    margin-top:35px;
+
+}
+
+.popupButtons button{
+
+    width:170px;
+
+    height:55px;
+
+    border:none;
+
+    border-radius:10px;
+
+    font-size:18px;
+
+    cursor:pointer;
+
+    transition:.2s;
+
+}
+
+.popupButtons button:hover{
+
+    transform:scale(1.05);
+
+}
+/* ===========================================
+   TIMER
+=========================================== */
+
+#timerArea{
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    gap:15px;
+
+    margin:20px 0;
+
+    flex-wrap:wrap;
+
+}
+
+#timerDisplay{
+
+    width:90px;
+
+    height:90px;
+
+    border-radius:50%;
+
+    background:#2196F3;
+
+    color:white;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    font-size:34px;
+
+    font-weight:bold;
+
+}
+
+#startTimerBtn{
+
+    padding:12px 22px;
+
+    font-size:18px;
+
+    cursor:pointer;
+
+}
+
+#muteBtn{
+
+    padding:12px 22px;
+
+    font-size:18px;
+
+    cursor:pointer;
+
+}
