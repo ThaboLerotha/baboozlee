@@ -119,7 +119,17 @@ const Score = {
 
         }
 
-        do{
+        // Advance until we land on a player who is not frozen. A player
+        // with skipTurns > 0 is skipped entirely for this pass (their
+        // skipTurns is decremented by exactly one), rather than being
+        // allowed to play immediately once it reaches 0 in the same pass.
+        // safetyLimit guards against every player being frozen at once,
+        // which would otherwise loop forever.
+        let skippedThisPass = true;
+
+        let safetyLimit = GameNight.players.length * 2;
+
+        while(skippedThisPass && safetyLimit > 0){
 
             GameNight.currentPlayer++;
 
@@ -135,11 +145,17 @@ const Score = {
 
                 current.skipTurns--;
 
+                skippedThisPass = true;
+
+            } else {
+
+                skippedThisPass = false;
+
             }
 
-        }
+            safetyLimit--;
 
-        while(current.skipTurns>0);
+        }
 
         this.update();
 
