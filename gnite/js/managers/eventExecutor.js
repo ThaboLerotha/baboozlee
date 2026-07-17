@@ -1,13 +1,18 @@
 /*
 =========================================
 EVENT EXECUTOR
-Version 2.0
+Version 2.1
 =========================================
 */
 
 const EventExecutor = {
 
-    execute(event, tile){
+    // execute() is async because targeted events must wait for the host
+    // to pick a player in TargetSelector before the effect can be applied.
+    // Non-targeted events simply return once their (synchronous) handler
+    // finishes -- awaiting a non-Promise value is a safe no-op in JS, so
+    // every handler can be called the same way here regardless of type.
+    async execute(event, tile){
 
         // Question-only tiles (and any tile with no real event) carry a
         // placeholder event of {type:"none"} and no "key". These are not
@@ -26,7 +31,7 @@ const EventExecutor = {
                 break;
 
             case "BOMB_OTHER":
-                this.bombOther(tile);
+                await this.bombOther(tile);
                 break;
 
             case "DOUBLE_POINTS":
@@ -42,15 +47,15 @@ const EventExecutor = {
                 break;
 
             case "FREEZE":
-                this.freeze(tile);
+                await this.freeze(tile);
                 break;
 
             case "STEAL":
-                this.steal(tile);
+                await this.steal(tile);
                 break;
 
             case "GIFT":
-                this.gift(tile);
+                await this.gift(tile);
                 break;
 
             case "JACKPOT":
@@ -89,29 +94,32 @@ const EventExecutor = {
     // Helpers
     // =========================================
 
-    // TODO (Phase 2): Replace with real target-selection UI where the host
-    // picks which player an event applies to. Until that exists, targeted
-    // events deterministically target the next player in turn order so the
-    // effect is at least real and testable.
-    getPlaceholderTarget(){
+    // Every player who can legally be targeted right now. Currently this
+    // is "everyone except the current player", but it also excludes
+    // p.eliminated so a future elimination mechanic can plug in without
+    // any changes here -- no player has that flag set today, so this is
+    // a no-op filter for now, not a new mechanic.
+    getEligibleTargets(){
 
-        const players = GameNight.players;
+        const current = Players.getCurrentPlayer();
 
-        if(!players || players.length < 2){
+        return GameNight.players.filter(p =>
 
-            return null;
+            p !== current && !p.eliminated
 
-        }
+        );
 
-        let index = GameNight.currentPlayer + 1;
+    },
 
-        if(index >= players.length){
+    // Wraps TargetSelector's callback style in a Promise so handlers can
+    // simply `await` the host's choice.
+    promptTarget(eligible, promptText){
 
-            index = 0;
+        return new Promise(resolve => {
 
-        }
+            TargetSelector.open(eligible, resolve, promptText);
 
-        return players[index];
+        });
 
     },
 
@@ -169,17 +177,25 @@ const EventExecutor = {
     // Targeted Events
     // =========================================
 
-    bombOther(tile){
+    async bombOther(tile){
 
-        const target = this.getPlaceholderTarget();
+        const eligible = this.getEligibleTargets();
 
-        if(!target){
+        if(eligible.length === 0){
 
-            console.warn("Bomb Other: no valid target player.");
+            console.warn("Bomb Other: no eligible target players.");
 
             return;
 
         }
+
+        const target = await this.promptTarget(
+
+            eligible,
+
+            "Choose someone to Bomb"
+
+        );
 
         if(this.consumeShieldIfPresent(target)){
 
@@ -195,17 +211,25 @@ const EventExecutor = {
 
     },
 
-    freeze(tile){
+    async freeze(tile){
 
-        const target = this.getPlaceholderTarget();
+        const eligible = this.getEligibleTargets();
 
-        if(!target){
+        if(eligible.length === 0){
 
-            console.warn("Freeze: no valid target player.");
+            console.warn("Freeze: no eligible target players.");
 
             return;
 
         }
+
+        const target = await this.promptTarget(
+
+            eligible,
+
+            "Choose someone to Freeze"
+
+        );
 
         if(this.consumeShieldIfPresent(target)){
 
@@ -221,17 +245,25 @@ const EventExecutor = {
 
     },
 
-    steal(tile){
+    async steal(tile){
 
-        const target = this.getPlaceholderTarget();
+        const eligible = this.getEligibleTargets();
 
-        if(!target){
+        if(eligible.length === 0){
 
-            console.warn("Steal: no valid target player.");
+            console.warn("Steal: no eligible target players.");
 
             return;
 
         }
+
+        const target = await this.promptTarget(
+
+            eligible,
+
+            "Choose someone to Steal from"
+
+        );
 
         if(this.consumeShieldIfPresent(target)){
 
@@ -251,17 +283,27 @@ const EventExecutor = {
 
     },
 
-    gift(tile){
+    // Gift is positive for the target, so shields (which only guard
+    // against negative effects) are intentionally ignored here.
+    async gift(tile){
 
-        const target = this.getPlaceholderTarget();
+        const eligible = this.getEligibleTargets();
 
-        if(!target){
+        if(eligible.length === 0){
 
-            console.warn("Gift: no valid target player.");
+            console.warn("Gift: no eligible target players.");
 
             return;
 
         }
+
+        const target = await this.promptTarget(
+
+            eligible,
+
+            "Choose someone to Gift"
+
+        );
 
         const amount = 100;
 
@@ -376,9 +418,10 @@ const EventExecutor = {
 
     },
 
-    // TODO (Phase 5): once the pass system exists, No Escape should
-    // actually prevent passing for a turn. Until then it strips every
-    // player's shield, so nobody can currently hide from board effects.
+    // TODO (Phase: Pass System): once the pass system exists, No Escape
+    // should actually prevent passing for a turn. Until then it strips
+    // every player's shield, so nobody can currently hide from board
+    // effects.
     noEscape(tile){
 
         GameNight.players.forEach(player => {

@@ -259,7 +259,7 @@ ${eventText}
 
     },
 
-    correct() {
+    async correct() {
 
         const tile = GameNight.board.find(
 
@@ -269,7 +269,7 @@ ${eventText}
 
         Score.addPoints(tile.points);
 
-        EventExecutor.execute(
+        await EventExecutor.execute(
 
             tile.event,
 
@@ -285,7 +285,7 @@ ${eventText}
 
     },
 
-    wrong() {
+    async wrong() {
 
         const tile = GameNight.board.find(
 
@@ -293,7 +293,7 @@ ${eventText}
 
         );
 
-        EventExecutor.execute(
+        await EventExecutor.execute(
 
             tile.event,
 
