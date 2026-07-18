@@ -236,3 +236,52 @@ Scope: this entry covers Part 1 only (Question System fix). Part 2
   silently reshuffling, and confirmed calling `reset()` again (as a new
   game would) correctly rebuilds and reshuffles a fresh, independently-
   ordered pool.
+
+---
+
+## Entry 4 — 30 new questions (pre-playtest stabilization, Part 2)
+
+### Files changed
+
+- `gnite/js/data/questionDatabase.js`
+
+### What changed
+
+- Added 30 new medium-difficulty True/False questions (ids 11-40),
+  spanning Science, Geography, History, Technology, Nature, General
+  Knowledge, Sports, and Entertainment (4 each in the first six
+  categories, 3 each in Sports/Entertainment -- a natural mix, not
+  forced to an exact even split).
+- Each new question includes an `explanation` field, which the
+  original 10 didn't have. `popup.js` already had a fallback
+  (`q.explanation || "No explanation available."`) ready for this, so
+  no UI changes were needed. The original 10 questions were left
+  completely untouched, per "preserve the existing QuestionDatabase
+  structure."
+- Total question count: 10 -> 40.
+
+### Verification performed
+
+- Syntax check on `questionDatabase.js`.
+- Programmatic check: exactly 40 total questions, all 40 ids unique,
+  all 30 new questions have every required field (`category`,
+  `question`, `answer`, `explanation`), and no duplicate question text
+  anywhere in the database (old or new).
+- Ran the actual `QuestionManager` (from Entry 3) against the real,
+  now-40-question database end-to-end: drew all 40 questions with zero
+  duplicates, then confirmed the pool correctly returns `null` with a
+  warning on the 41st draw rather than repeating.
+
+### Known issues
+
+- None.
+
+### Deferred work / technical debt
+
+- The original 10 questions still have no `explanation` field. Not
+  touched in this entry, out of scope ("preserve the existing
+  QuestionDatabase structure" / "do not duplicate existing
+  questions" -- editing them wasn't requested).
+- With 40 questions against a 30-tile board needing ~25, pool
+  exhaustion should now be rare-to-nonexistent in a single game, but
+  the graceful `null` fallback from Entry 3 remains in place regardless.
