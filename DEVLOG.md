@@ -108,3 +108,70 @@ it does. Not user-facing.
   scattered through `EventExecutor` rather than a central `GameEconomy`
   config. Flagged for a future refinement pass, intentionally deferred
   per instruction — do not change without explicit approval.
+
+---
+
+## Entry 2 — Phase 4: Pass System
+
+### Files changed
+
+- `gnite/js/game/players.js`
+- `gnite/index.html`
+- `gnite/js/ui/popup.js`
+- `gnite/js/ui/ui.js`
+- `gnite/js/managers/score.js`
+
+### Architectural changes
+
+- **`passesRemaining` lives on the player object**, not a global counter
+  (`player.passesRemaining`, starts at 2), per instruction — this keeps
+  it consistent with every other player-level status (`shield`,
+  `skipTurns`, `doublePoints`, `bonusTurn`) and means future events or
+  Contracts that grant/remove a Pass just read/write one field on one
+  player, no new bookkeeping structure needed.
+- **`Popup.pass()` mirrors `correct()`/`wrong()` almost exactly** —
+  same tile lookup, same `await EventExecutor.execute(tile.event, tile)`,
+  same `Board.markUsed()` + `Score.nextPlayer()` + `close()` sequence.
+  The only difference is no `Score.addPoints()` call and the
+  `passesRemaining` decrement. This means a tile's event fires on Pass
+  exactly the same way it does on Correct/Wrong, satisfying "the tile's
+  event still activates" from the spec without any special-casing in
+  `EventExecutor`.
+- **The Pass button is revealed conditionally.** `reveal()` only
+  unhides `passBtn` if `Players.getCurrentPlayer().passesRemaining > 0`;
+  at 0 it's hidden, so a host can't attempt an invalid Pass through the
+  UI. `Popup.pass()` still guards against `passesRemaining <= 0` itself
+  in case that's ever called some other way.
+
+### Gameplay effects now implemented
+
+| Rule | Behavior |
+|---|---|
+| Pass timing | Only available after the question is revealed (button hidden until then) |
+| Pass availability | Hidden once a player's `passesRemaining` reaches 0 |
+| Passing | No points awarded; tile still marked used; tile's event (if any) still fires; turn advances normally via `Score.nextPlayer()` |
+| Pass count | Starts at 2 per player, decremented by 1 per use, never regained automatically |
+| Visibility | Each player's remaining passes shown on the scoreboard (🔁 icon) at all times, not just when the popup is open |
+
+### Known issues
+
+- None introduced by this phase. Verified with a standalone bookkeeping
+  simulation (decrement-and-guard logic in isolation) and a DOM ID
+  cross-reference check before committing.
+
+### Future hooks added
+
+- `player.passesRemaining` is a plain number a future event/Contract can
+  increment or decrement directly (e.g. a "Gain a Pass" event, or a
+  Contract reward like "Never Pass → +500") without touching
+  `EventExecutor`'s targeting or board-mutation machinery at all.
+
+### Deferred work / technical debt
+
+- No pass-interaction *events* exist yet (Lose Pass, Gain Pass, Forced
+  Pass, Pass Shield, Pass Theft from the original design notes). Those
+  depend on the Pass System existing first, which it now does — but
+  they weren't in scope for this phase and weren't added.
+- No UI currently celebrates or announces a Pass differently from a
+  wrong answer (no distinct message/sound). Left as-is; Audio phase is
+  still pure polish, out of scope.

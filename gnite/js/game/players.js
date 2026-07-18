@@ -63,7 +63,15 @@ const Players = {
 
                 shield: false,
 
-                doublePoints: false
+                doublePoints: false,
+
+                // Each player starts with 2 Passes for the game. A Pass
+                // can be used once the question on their tile has been
+                // revealed instead of answering Correct/Wrong: it awards
+                // no points, but still consumes the tile and still
+                // triggers the tile's event. Not regained unless a
+                // future event/mechanic explicitly grants one.
+                passesRemaining: 2
 
             });
 

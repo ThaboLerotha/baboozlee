@@ -57,6 +57,10 @@ const Popup = {
             .getElementById("wrongBtn")
             .classList.add("hidden");
 
+        document
+            .getElementById("passBtn")
+            .classList.add("hidden");
+
         const startBtn = document.getElementById("startTimerBtn");
 
         if(startBtn){
@@ -243,6 +247,18 @@ ${eventText}
             .getElementById("wrongBtn")
             .classList.remove("hidden");
 
+        const passBtn = document.getElementById("passBtn");
+
+        if(Players.getCurrentPlayer().passesRemaining > 0){
+
+            passBtn.classList.remove("hidden");
+
+        } else {
+
+            passBtn.classList.add("hidden");
+
+        }
+
     },
 
     close() {
@@ -286,6 +302,46 @@ ${eventText}
     },
 
     async wrong() {
+
+        const tile = GameNight.board.find(
+
+            t => t.id === this.currentTile
+
+        );
+
+        await EventExecutor.execute(
+
+            tile.event,
+
+            tile
+
+        );
+
+        Board.markUsed(this.currentTile);
+
+        Score.nextPlayer();
+
+        this.close();
+
+    },
+
+    // A Pass awards no points, but the tile is still consumed and its
+    // event (if any) still fires -- the only difference from wrong() is
+    // the passesRemaining deduction. Guarded against passesRemaining
+    // being 0, though reveal() already hides the button in that case.
+    async pass() {
+
+        const current = Players.getCurrentPlayer();
+
+        if(current.passesRemaining <= 0){
+
+            return;
+
+        }
+
+        current.passesRemaining -= 1;
+
+        Score.update();
 
         const tile = GameNight.board.find(
 

@@ -162,6 +162,26 @@ const UI = {
         }
 
         // -----------------------------
+        // PASS
+        // -----------------------------
+
+        const passBtn = document.getElementById("passBtn");
+
+        if (passBtn) {
+
+            passBtn.addEventListener("click", () => {
+
+                Popup.pass();
+
+            });
+
+        } else {
+
+            console.error("passBtn not found");
+
+        }
+
+        // -----------------------------
         // CLOSE
         // -----------------------------
 

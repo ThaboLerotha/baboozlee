@@ -21,7 +21,7 @@ const Score = {
 
         GameNight.players.forEach(player => {
 
-            let status = "";
+            let status = " 🔁" + player.passesRemaining;
 
             if(player.skipTurns > 0){
 
