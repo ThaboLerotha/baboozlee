@@ -27,7 +27,17 @@ const QuestionManager = {
 
         if (this.availableQuestions.length === 0) {
 
-            this.reset();
+            // Exhausted for this game. Per design, we never silently
+            // reshuffle or reuse a question mid-game -- reset() only
+            // happens explicitly at the start of a new game (see
+            // ui.js's startGameBtn handler). Callers must handle null.
+            console.warn(
+
+                "QuestionManager: question pool exhausted for this game."
+
+            );
+
+            return null;
 
         }
 

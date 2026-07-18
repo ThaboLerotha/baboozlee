@@ -175,3 +175,64 @@ it does. Not user-facing.
 - No UI currently celebrates or announces a Pass differently from a
   wrong answer (no distinct message/sound). Left as-is; Audio phase is
   still pure polish, out of scope.
+
+---
+
+## Entry 3 — Question System robustness (pre-playtest stabilization)
+
+Scope: this entry covers Part 1 only (Question System fix). Part 2
+(30 new questions) is a separate commit, logged separately once done.
+
+### Files changed
+
+- `gnite/js/managers/questionManager.js`
+- `gnite/js/ui/popup.js`
+
+### Architectural changes
+
+- **`getQuestion()` no longer auto-reshuffles on exhaustion.** It used
+  to silently call `this.reset()` and keep going the moment the pool
+  ran dry, which meant a question could repeat within the same game
+  with no way to tell. It now returns `null` and logs a warning
+  instead. `reset()` itself is unchanged and still only runs
+  explicitly at the start of a new game, from `startGameBtn`'s handler
+  in `ui.js` (confirmed this was already correct -- the bug was only
+  inside `getQuestion()`).
+- **`Popup.open()` now handles a `null` tile.question gracefully.**
+  This was a necessary consequence of the fix above, not scope creep:
+  with only 10 questions in the database against a 30-tile board where
+  ~85% of tiles need one, the pool exhausting mid-build is the normal
+  case today, not an edge case -- every game would have hit `null`
+  and crashed on `q.category` without this. The fallback shows a clear
+  message and lets the host resolve the tile with Correct/Wrong/Pass
+  manually; none of those three methods read `tile.question`, so
+  scoring and event-firing are unaffected.
+
+### Known issues
+
+- None introduced. This entry exists specifically because the previous
+  question pool size (10) made exhaustion the common case, not the
+  exception -- Part 2 addresses that directly.
+
+### Future hooks added
+
+- None -- this was a bug fix, not new surface area.
+
+### Deferred work / technical debt
+
+- Existing 10 questions in `questionDatabase.js` have no `explanation`
+  field (`popup.js` already falls back to "No explanation available.").
+  Part 2's new questions will include explanations; the original 10
+  were left untouched, per "preserve the existing QuestionDatabase
+  structure."
+
+### Verification performed
+
+- Full syntax check across every JS file.
+- DOM-id cross-reference check (no orphaned `getElementById` calls).
+- Standalone Node simulation against a synthetic 10-question database:
+  confirmed all 10 questions are drawn exactly once with no duplicates,
+  confirmed the exhausted pool returns `null` repeatedly without
+  silently reshuffling, and confirmed calling `reset()` again (as a new
+  game would) correctly rebuilds and reshuffles a fresh, independently-
+  ordered pool.

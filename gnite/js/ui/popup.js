@@ -123,6 +123,40 @@ ${tile.event.type}
 
         const q = tile.question;
 
+        // The question pool can legitimately run out before the board
+        // finishes filling (see QuestionManager.getQuestion()). Rather
+        // than crash on q.category below, show a clear fallback so the
+        // host can still resolve the tile manually.
+        if(!q){
+
+            document
+                .getElementById("popupQuestion")
+                .innerHTML = `
+
+<h2>Tile ${tile.label}</h2>
+
+<h3>⭐ ${tile.points} Points</h3>
+
+<hr><br>
+
+<p>⚠️ No question available for this tile -- the question pool ran out.</p>
+
+`;
+
+            document
+                .getElementById("popupAnswer")
+                .innerHTML = `
+
+<hr><br>
+
+<p>Host may resolve this tile with Correct, Wrong, or Pass at their discretion.</p>
+
+`;
+
+            return;
+
+        }
+
         document
             .getElementById("popupQuestion")
             .innerHTML = `
