@@ -187,13 +187,27 @@ const EventDatabase = [
 
     },
 
+    {
+
+        id: 13,
+
+        key: "METEOR",
+
+        type: "meteor",
+
+        target: "board",
+
+        copies: 1
+
+    },
+
     // =====================================
     // GLOBAL EVENTS
     // =====================================
 
     {
 
-        id: 13,
+        id: 14,
 
         key: "TIME_WARP",
 
@@ -207,7 +221,7 @@ const EventDatabase = [
 
     {
 
-        id: 14,
+        id: 15,
 
         key: "NO_ESCAPE",
 

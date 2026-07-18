@@ -74,6 +74,10 @@ const EventExecutor = {
                 this.cleanup(tile);
                 break;
 
+            case "METEOR":
+                this.meteor(tile);
+                break;
+
             case "TIME_WARP":
                 this.timeWarp(tile);
                 break;
@@ -320,72 +324,49 @@ const EventExecutor = {
     // =========================================
     // Board Events
     // =========================================
+    //
+    // Every handler below just triggers a named Board mutation and lets
+    // Board own the actual tile manipulation -- EventExecutor doesn't
+    // touch GameNight.board directly anywhere in this section.
 
+    // Removes the board's cheapest remaining tiles from play, making the
+    // rest of the board worth more on average.
     jackpot(tile){
 
-        Score.addPoints(300);
+        Board.removeLowValueTiles(3);
 
     },
 
+    // Strips the hidden event from a few random event-bearing tiles,
+    // turning them into ordinary stale/question tiles.
     badJackpot(tile){
 
-        Score.subtractPoints(300);
+        Board.convertRandomEventTiles(3);
 
     },
 
-    // Shuffles the hidden events among the other unused event/mixed tiles,
-    // so players who memorized where an event was hiding can no longer
-    // rely on that information.
+    // Shuffles hidden events among the other unrevealed event/mixed
+    // tiles, so previously-suspected event locations are no longer
+    // reliable.
     chaos(tile){
 
-        const candidates = GameNight.board.filter(t =>
-
-            !t.used &&
-            t.id !== tile.id &&
-            (t.tileType === "event" || t.tileType === "mixed")
-
-        );
-
-        if(candidates.length < 2){
-
-            return;
-
-        }
-
-        const events = candidates.map(t => t.event);
-
-        Board.shuffle(events);
-
-        candidates.forEach((t, index) => {
-
-            t.event = events[index];
-
-        });
+        Board.shuffleHiddenEvents(tile.id);
 
     },
 
-    // Removes one hidden event from the board entirely, converting that
-    // tile's event back to "none" (its question, if any, is unaffected).
+    // A smaller Bad Jackpot: strips the hidden event from just one
+    // random event-bearing tile.
     cleanup(tile){
 
-        const candidates = GameNight.board.filter(t =>
+        Board.convertRandomEventTiles(1);
 
-            !t.used &&
-            t.id !== tile.id &&
-            t.event &&
-            t.event.type !== "none"
+    },
 
-        );
+    // Destroys roughly 30% of the remaining unrevealed tiles without
+    // revealing them. Rare and severe by design.
+    meteor(tile){
 
-        if(candidates.length === 0){
-
-            return;
-
-        }
-
-        const index = Math.floor(Math.random() * candidates.length);
-
-        candidates[index].event = { type: "none" };
+        Board.destroyRandomTiles(0.30, tile.id);
 
     },
 
