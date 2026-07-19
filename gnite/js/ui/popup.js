@@ -1,18 +1,31 @@
 /*
 =========================================
 POPUP SYSTEM
-Version 1.1
+Version 1.2
 =========================================
 */
+
+// Stale tiles have no real event (tile.event.type stays "none" on
+// purpose -- see Board.convertTilesToStale()), so they can't pull a
+// name/description from EventDatabase without pretending to be a real,
+// targetable event. This local, display-only info object lets the
+// popup render them with the same Name + Description visual pattern
+// as everything else, without touching the actual event system.
+const STALE_TILE_INFO = {
+
+    name: "Stale Tile",
+
+    description: "No special effects. This tile is only worth its points."
+
+};
 
 const Popup = {
 
     currentTile: null,
 
     // Set in open(), read by reveal(): pure Event tiles have no question
-    // to judge, so the Correct button never applies to them -- only
-    // Pass or the (relabeled) "Continue" button, which reuses wrong()'s
-    // existing no-points/fire-event/advance-turn behavior unchanged.
+    // to judge, so Correct/Wrong never apply to them -- only Continue
+    // (see continueEvent()) and, until reveal, Pass.
     isPureEventTile: false,
 
     open(tileID) {
@@ -63,18 +76,18 @@ const Popup = {
             .getElementById("correctBtn")
             .classList.add("hidden");
 
-        const wrongBtn = document.getElementById("wrongBtn");
+        document
+            .getElementById("wrongBtn")
+            .classList.add("hidden");
 
-        wrongBtn.classList.add("hidden");
+        document
+            .getElementById("continueBtn")
+            .classList.add("hidden");
 
-        // "Wrong" doesn't make sense as a label on a tile with no
-        // question -- it's still the same wrong() logic underneath
-        // (no points, fires the event, consumes the tile, advances the
-        // turn), just relabeled for pure Event tiles.
-        wrongBtn.textContent = this.isPureEventTile ? "Continue" : "Wrong";
-
-        // Pass is now available the moment the popup opens, before
-        // anything is revealed -- not gated behind reveal() anymore.
+        // Pass is available the moment the popup opens, before anything
+        // is revealed -- but it expires once Reveal is clicked (see
+        // reveal() below), since the gamble is choosing the tile, not
+        // dodging what it turns out to contain.
         const passBtn = document.getElementById("passBtn");
 
         if(Players.getCurrentPlayer().passesRemaining > 0){
@@ -87,7 +100,7 @@ const Popup = {
 
         }
 
-        // Pure Event tiles have no timer (Priority 2).
+        // Pure Event tiles have no timer.
 
         const startBtn = document.getElementById("startTimerBtn");
 
@@ -237,11 +250,15 @@ ${eventTeaser}
 
 `;
 
-        let eventText = "";
+        // Both real events and Stale tiles render through the same
+        // Name + Description visual pattern -- Stale just pulls its
+        // copy from the local STALE_TILE_INFO constant above instead
+        // of EventDatabase, since it isn't a real, targetable event.
+        let infoBlock = "";
 
         if(hasRealEvent){
 
-            eventText = `
+            infoBlock = `
 
 <hr>
 
@@ -253,21 +270,17 @@ ${eventTeaser}
 
 `;
 
-        }
+        } else if(tile.isStale){
 
-        if(tile.isStale){
-
-            eventText = `
+            infoBlock = `
 
 <hr>
 
-<p>
+<h3>Tile Info</h3>
 
-🍃 This is a Stale Tile.
+<p><strong>${STALE_TILE_INFO.name}</strong></p>
 
-No special effects.
-
-</p>
+<p>${STALE_TILE_INFO.description}</p>
 
 `;
 
@@ -301,7 +314,7 @@ ${q.explanation || "No explanation available."}
 
 </p>
 
-${eventText}
+${infoBlock}
 
 `;
 
@@ -331,23 +344,29 @@ ${eventText}
 
         }
 
-        // Correct doesn't apply to a tile with no question.
+        // Pass expires the moment the tile's contents are revealed --
+        // the gamble was choosing the tile, not what happens after.
+        document
+            .getElementById("passBtn")
+            .classList.add("hidden");
 
-        if(!this.isPureEventTile){
+        if(this.isPureEventTile){
+
+            document
+                .getElementById("continueBtn")
+                .classList.remove("hidden");
+
+        } else {
 
             document
                 .getElementById("correctBtn")
                 .classList.remove("hidden");
 
+            document
+                .getElementById("wrongBtn")
+                .classList.remove("hidden");
+
         }
-
-        document
-            .getElementById("wrongBtn")
-            .classList.remove("hidden");
-
-        // Pass's visibility was already decided in open() and doesn't
-        // change between open() and reveal() -- passesRemaining can't
-        // change mid-popup, so it's intentionally left alone here.
 
     },
 
@@ -365,7 +384,10 @@ ${eventText}
 
     },
 
-    async correct() {
+    // Shared by correct()/wrong()/continueEvent()/pass(): every path
+    // that resolves a tile fires its event, marks it used, and advances
+    // the turn the same way. Only whether points are awarded differs.
+    async _resolveTile(awardPoints) {
 
         const tile = GameNight.board.find(
 
@@ -373,7 +395,11 @@ ${eventText}
 
         );
 
-        Score.addPoints(tile.points);
+        if(awardPoints){
+
+            Score.addPoints(tile.points);
+
+        }
 
         await EventExecutor.execute(
 
@@ -391,34 +417,33 @@ ${eventText}
 
     },
 
+    async correct() {
+
+        await this._resolveTile(true);
+
+    },
+
     async wrong() {
 
-        const tile = GameNight.board.find(
+        await this._resolveTile(false);
 
-            t => t.id === this.currentTile
+    },
 
-        );
+    // The dedicated resolve action for pure Event tiles. There was
+    // never a question, so "Wrong" would be a misleading label and
+    // function name -- this exists purely so the UI and the code both
+    // honestly describe what happened: the tile had no question, and
+    // its event is now firing.
+    async continueEvent() {
 
-        await EventExecutor.execute(
-
-            tile.event,
-
-            tile
-
-        );
-
-        Board.markUsed(this.currentTile);
-
-        Score.nextPlayer();
-
-        this.close();
+        await this._resolveTile(false);
 
     },
 
     // A Pass awards no points, but the tile is still consumed and its
     // event (if any) still fires -- the only difference from wrong() is
     // the passesRemaining deduction. Guarded against passesRemaining
-    // being 0, though it's already hidden in that case (see open()).
+    // being 0, though the button is already hidden in that case.
     async pass() {
 
         const current = Players.getCurrentPlayer();
@@ -433,25 +458,7 @@ ${eventText}
 
         Score.update();
 
-        const tile = GameNight.board.find(
-
-            t => t.id === this.currentTile
-
-        );
-
-        await EventExecutor.execute(
-
-            tile.event,
-
-            tile
-
-        );
-
-        Board.markUsed(this.currentTile);
-
-        Score.nextPlayer();
-
-        this.close();
+        await this._resolveTile(false);
 
     }
 

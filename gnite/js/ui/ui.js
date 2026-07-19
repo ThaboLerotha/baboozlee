@@ -162,6 +162,26 @@ const UI = {
         }
 
         // -----------------------------
+        // CONTINUE (pure Event Tiles only)
+        // -----------------------------
+
+        const continueBtn = document.getElementById("continueBtn");
+
+        if (continueBtn) {
+
+            continueBtn.addEventListener("click", () => {
+
+                Popup.continueEvent();
+
+            });
+
+        } else {
+
+            console.error("continueBtn not found");
+
+        }
+
+        // -----------------------------
         // PASS
         // -----------------------------
 

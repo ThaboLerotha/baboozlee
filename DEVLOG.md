@@ -374,3 +374,70 @@ elements or new methods were added.
   CSS class on `popupAnswer`) toggles correctly before/after reveal --
   content being pre-built into the DOM before reveal is pre-existing
   architecture from before this phase, not something introduced here.
+
+---
+
+## Entry 6 — Playtest fixes: dedicated continueEvent(), Pass expiry, Stale tile display
+
+### Files changed
+
+- `gnite/index.html`
+- `gnite/js/ui/ui.js`
+- `gnite/js/ui/popup.js`
+
+### What changed
+
+**Code quality fix (queued from Entry 5).** Replaced the "relabel
+Wrong's button text to Continue" hack with a real, dedicated
+`continueBtn` in the HTML, wired to a new `Popup.continueEvent()`
+method. `correct()`, `wrong()`, `continueEvent()`, and `pass()` now all
+call a shared private `_resolveTile(awardPoints)` helper -- the
+underlying steps (fire event, mark used, advance turn) are still
+shared, but every public method's name now honestly describes why it
+was called instead of `wrong()` firing when nothing was actually
+judged wrong.
+
+**Playtest fix 1 -- Stale tile display.** The old hardcoded "🍃 This is
+a Stale Tile. No special effects." paragraph is gone. Stale tiles now
+render through the same Name + Description visual pattern as every
+real event, sourced from a local `STALE_TILE_INFO` constant in
+`popup.js` (not `eventDatabase.js` -- a Stale tile's `event.type` stays
+`"none"` on purpose, so it can't be given a real database entry
+without becoming a false positive for Chaos/Cleanup/Bad Jackpot's
+"has a real event" targeting filters, which all check
+`event.type !== "none"`).
+
+**Playtest fix 2 -- Pass expires after reveal.** `passBtn` is now
+explicitly hidden inside `reveal()`, for every tile type. Previously
+Pass stayed visible after reveal on some paths; now the gamble is
+strictly "choose to Pass before you know what you're getting into,"
+matching the intended design.
+
+### Known issues
+
+- None found. See verification below.
+
+### Future hooks added
+
+- `Popup._resolveTile()` is now the one place that fires an event,
+  marks a tile used, and advances the turn. Any future action that
+  needs to resolve a tile (a Contract effect, for example) has one
+  clear internal method to call rather than needing to duplicate that
+  sequence again.
+
+### Deferred work / technical debt
+
+- None introduced by this entry.
+
+### Verification performed
+
+- Full syntax sweep across every JS file.
+- DOM-id cross-reference check (no orphaned `getElementById` calls,
+  confirms `continueBtn` is correctly wired on both sides).
+- DOM-mock functional simulation covering all three fixes: confirmed
+  `continueEvent()` fires the tile's event without awarding points and
+  without touching the old `wrongBtn` label; confirmed Pass is hidden
+  immediately after `reveal()` on both a pure Event tile and a Mixed
+  tile; confirmed a Stale tile's revealed content no longer contains
+  the old hardcoded message and instead contains the new Name +
+  Description block under a "Tile Info" heading.
