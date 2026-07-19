@@ -1,13 +1,19 @@
 /*
 =========================================
 POPUP SYSTEM
-Version 1.0
+Version 1.1
 =========================================
 */
 
 const Popup = {
 
     currentTile: null,
+
+    // Set in open(), read by reveal(): pure Event tiles have no question
+    // to judge, so the Correct button never applies to them -- only
+    // Pass or the (relabeled) "Continue" button, which reuses wrong()'s
+    // existing no-points/fire-event/advance-turn behavior unchanged.
+    isPureEventTile: false,
 
     open(tileID) {
 
@@ -18,6 +24,10 @@ const Popup = {
             t => t.id === tileID
 
         );
+
+        const hasRealEvent = tile.event && tile.event.type !== "none";
+
+        this.isPureEventTile = tile.tileType === "event";
 
         // Reset timer
 
@@ -53,19 +63,47 @@ const Popup = {
             .getElementById("correctBtn")
             .classList.add("hidden");
 
-        document
-            .getElementById("wrongBtn")
-            .classList.add("hidden");
+        const wrongBtn = document.getElementById("wrongBtn");
 
-        document
-            .getElementById("passBtn")
-            .classList.add("hidden");
+        wrongBtn.classList.add("hidden");
+
+        // "Wrong" doesn't make sense as a label on a tile with no
+        // question -- it's still the same wrong() logic underneath
+        // (no points, fires the event, consumes the tile, advances the
+        // turn), just relabeled for pure Event tiles.
+        wrongBtn.textContent = this.isPureEventTile ? "Continue" : "Wrong";
+
+        // Pass is now available the moment the popup opens, before
+        // anything is revealed -- not gated behind reveal() anymore.
+        const passBtn = document.getElementById("passBtn");
+
+        if(Players.getCurrentPlayer().passesRemaining > 0){
+
+            passBtn.classList.remove("hidden");
+
+        } else {
+
+            passBtn.classList.add("hidden");
+
+        }
+
+        // Pure Event tiles have no timer (Priority 2).
 
         const startBtn = document.getElementById("startTimerBtn");
 
+        const timerDisplay = document.getElementById("timerDisplay");
+
+        const showTimer = !this.isPureEventTile;
+
         if(startBtn){
 
-            startBtn.classList.remove("hidden");
+            startBtn.classList.toggle("hidden", !showTimer);
+
+        }
+
+        if(timerDisplay){
+
+            timerDisplay.classList.toggle("hidden", !showTimer);
 
         }
 
@@ -73,7 +111,7 @@ const Popup = {
         // EVENT TILE
         // =====================================
 
-        if(tile.tileType === "event"){
+        if(this.isPureEventTile){
 
             document
                 .getElementById("popupQuestion")
@@ -81,15 +119,17 @@ const Popup = {
 
 <h2>Tile ${tile.label}</h2>
 
-<h3>⭐ ${tile.points} Points</h3>
-
 <hr><br>
 
 <h2>🎲 EVENT TILE</h2>
 
 <p>No question on this tile.</p>
 
-<p>Reveal the event to continue.</p>
+<hr>
+
+<h3>Hidden Event</h3>
+
+<p>❓ ???</p>
 
 `;
 
@@ -99,17 +139,11 @@ const Popup = {
 
 <hr><br>
 
-<h3>Event</h3>
+<h3>Hidden Event</h3>
 
-<p>
+<p><strong>${tile.event.name}</strong></p>
 
-<strong>
-
-${tile.event.type}
-
-</strong>
-
-</p>
+<p>${tile.event.description}</p>
 
 `;
 
@@ -122,6 +156,16 @@ ${tile.event.type}
         // =====================================
 
         const q = tile.question;
+
+        const eventTeaser = hasRealEvent ? `
+
+<hr>
+
+<h3>Hidden Event</h3>
+
+<p>❓ ???</p>
+
+` : "";
 
         // The question pool can legitimately run out before the board
         // finishes filling (see QuestionManager.getQuestion()). Rather
@@ -141,6 +185,8 @@ ${tile.event.type}
 
 <p>⚠️ No question available for this tile -- the question pool ran out.</p>
 
+${eventTeaser}
+
 `;
 
             document
@@ -150,6 +196,18 @@ ${tile.event.type}
 <hr><br>
 
 <p>Host may resolve this tile with Correct, Wrong, or Pass at their discretion.</p>
+
+${hasRealEvent ? `
+
+<hr>
+
+<h3>Hidden Event</h3>
+
+<p><strong>${tile.event.name}</strong></p>
+
+<p>${tile.event.description}</p>
+
+` : ""}
 
 `;
 
@@ -175,11 +233,13 @@ ${q.category}
 
 ${q.question}
 
+${eventTeaser}
+
 `;
 
         let eventText = "";
 
-        if(tile.tileType === "mixed"){
+        if(hasRealEvent){
 
             eventText = `
 
@@ -187,11 +247,9 @@ ${q.question}
 
 <h3>Hidden Event</h3>
 
-<p>
+<p><strong>${tile.event.name}</strong></p>
 
-An event will activate after this tile.
-
-</p>
+<p>${tile.event.description}</p>
 
 `;
 
@@ -273,25 +331,23 @@ ${eventText}
 
         }
 
-        document
-            .getElementById("correctBtn")
-            .classList.remove("hidden");
+        // Correct doesn't apply to a tile with no question.
+
+        if(!this.isPureEventTile){
+
+            document
+                .getElementById("correctBtn")
+                .classList.remove("hidden");
+
+        }
 
         document
             .getElementById("wrongBtn")
             .classList.remove("hidden");
 
-        const passBtn = document.getElementById("passBtn");
-
-        if(Players.getCurrentPlayer().passesRemaining > 0){
-
-            passBtn.classList.remove("hidden");
-
-        } else {
-
-            passBtn.classList.add("hidden");
-
-        }
+        // Pass's visibility was already decided in open() and doesn't
+        // change between open() and reveal() -- passesRemaining can't
+        // change mid-popup, so it's intentionally left alone here.
 
     },
 
@@ -362,7 +418,7 @@ ${eventText}
     // A Pass awards no points, but the tile is still consumed and its
     // event (if any) still fires -- the only difference from wrong() is
     // the passesRemaining deduction. Guarded against passesRemaining
-    // being 0, though reveal() already hides the button in that case.
+    // being 0, though it's already hidden in that case (see open()).
     async pass() {
 
         const current = Players.getCurrentPlayer();

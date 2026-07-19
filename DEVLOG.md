@@ -285,3 +285,92 @@ Scope: this entry covers Part 1 only (Question System fix). Part 2
 - With 40 questions against a 30-tile board needing ~25, pool
   exhaustion should now be rare-to-nonexistent in a single game, but
   the graceful `null` fallback from Entry 3 remains in place regardless.
+
+---
+
+## Entry 5 — UI/UX polish: event descriptions, timer/points on Event Tiles, Pass timing
+
+Scope: UI/UX only, based on playtesting feedback. Event System logic
+was assumed correct and not touched.
+
+### Files changed
+
+- `gnite/js/data/eventDatabase.js`
+- `gnite/js/ui/popup.js`
+
+### What changed
+
+**Priority 1 -- Event descriptions.** Every entry in `eventDatabase.js`
+now has a `name` (e.g. "Bomb Other") and `description` (e.g. "Choose
+another player. They lose 200 points.") field. `popup.js` renders
+`tile.event.name`/`tile.event.description` directly -- no event text is
+hardcoded in the popup. The database remains the single source of
+truth.
+
+**Priority 2 -- No timer on pure Event Tiles.** `startTimerBtn` and
+`timerDisplay` are hidden for `tileType === "event"` tiles, shown for
+everything else. `muteBtn` (a global sound toggle, not a per-tile
+timer control) was left untouched.
+
+**Priority 3 -- No points banner on pure Event Tiles.** The `⭐ N
+Points` line is omitted entirely from a pure Event tile's popup.
+Question, Mixed, and Stale tiles are unchanged.
+
+**Priority 4 -- Pass timing + reveal flow (spec revised mid-phase).**
+The interaction flow changed from the original Pass System design:
+Pass is now visible the moment the popup opens (for every tile type,
+including pure Event tiles), before the Answer or the Hidden Event is
+revealed. Clicking Reveal shows the Answer and the Hidden Event's name
++ description together. A "Hidden Event / ❓ ???" teaser appears
+immediately on open() for any tile carrying a real event (Event or
+Mixed), replaced with the actual name/description once revealed.
+
+### A decision I made without asking (flagged, not hidden)
+
+The spec said pure Event Tiles should let the host choose "Pass (if
+desired), Close, or whatever controls are appropriate" after reveal.
+Taken literally, "Correct" was already wired to every tile via the
+shared reveal() flow, including Event tiles -- meaning a host could
+click Correct on an Event tile and silently receive `tile.points`
+despite Priority 3 explicitly saying Event tiles aren't worth points.
+I hid the Correct button entirely for pure Event tiles (there's no
+question to be correct about) and relabeled the existing Wrong button
+to "Continue" for that tile type only. `wrong()`'s underlying logic
+was not changed -- it already awarded no points and already fired the
+tile's event, marked it used, and advanced the turn, which is exactly
+the behavior an Event tile's "resolve" action needs. No new DOM
+elements or new methods were added.
+
+### Known issues
+
+- None found. See verification below.
+
+### Future hooks added
+
+- None -- this was UI/UX polish on existing data and existing button
+  plumbing, not new surface area.
+
+### Deferred work / technical debt
+
+- Not addressed in this phase (explicitly out of scope): Event System
+  redesign/rebalancing, Contracts, Awards, sounds, scoreboard changes,
+  cosmetic GUI polish beyond what the four priorities required.
+
+### Verification performed
+
+- Syntax check across every JS file.
+- DOM-id cross-reference check (no orphaned `getElementById` calls).
+- Programmatic check on `eventDatabase.js`: all 15 events have both
+  `name` and `description`, total count unchanged at 15.
+- DOM-mock functional simulation of `Popup.open()`/`reveal()` across
+  three tile types (pure Event, Mixed, plain Question):
+  confirmed Pass visibility on open (immediate, and correctly hidden
+  when `passesRemaining` is 0), timer/points banner shown or hidden
+  correctly per tile type, the "❓ ???" teaser appearing only when a
+  real event exists, Correct staying hidden through reveal on Event
+  tiles while Wrong/Continue becomes visible, and the event
+  name/description appearing correctly in the DOM after reveal.
+- Separately confirmed the actual concealment mechanism (the `hidden`
+  CSS class on `popupAnswer`) toggles correctly before/after reveal --
+  content being pre-built into the DOM before reveal is pre-existing
+  architecture from before this phase, not something introduced here.
