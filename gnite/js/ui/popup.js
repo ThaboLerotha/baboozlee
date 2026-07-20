@@ -409,6 +409,28 @@ ${infoBlock}
 
         );
 
+        // Some events change visible state right before the tile
+        // resolves (Time Warp halves the on-screen timer, for
+        // example). Without a yield here, the popup can close and hide
+        // that change in the same synchronous turn, before the browser
+        // ever paints it -- so the DOM value is correct, but the host
+        // never actually sees it. Two animation frames reliably
+        // guarantees at least one paint has happened in between, and
+        // costs about 1/30th of a second -- imperceptible, but enough.
+        await new Promise(resolve => {
+
+            if(typeof requestAnimationFrame !== "undefined"){
+
+                requestAnimationFrame(() => requestAnimationFrame(resolve));
+
+            } else {
+
+                resolve();
+
+            }
+
+        });
+
         Board.markUsed(this.currentTile);
 
         Score.nextPlayer();

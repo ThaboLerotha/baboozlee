@@ -414,6 +414,11 @@ main{
 
     max-width:90%;
 
+    /* Popup must never exceed the viewport -- this is what makes the
+       scroll area below meaningful instead of the box just growing
+       past the screen. */
+    max-height:90vh;
+
     background:white;
 
     color:black;
@@ -425,6 +430,23 @@ main{
     text-align:center;
 
     box-shadow:0 15px 50px rgba(0,0,0,.5);
+
+    display:flex;
+
+    flex-direction:column;
+
+}
+
+/* Only this region scrolls. min-height:0 is required here -- without
+   it, a flex child won't shrink below its content's natural height,
+   which would silently defeat the max-height/overflow behavior above. */
+#popupScrollArea{
+
+    overflow-y:auto;
+
+    flex:1 1 auto;
+
+    min-height:0;
 
 }
 
@@ -453,6 +475,14 @@ main{
     gap:25px;
 
     margin-top:35px;
+
+    padding-top:20px;
+
+    border-top:1px solid rgba(0,0,0,.1);
+
+    /* Never shrinks and never scrolls away -- stays pinned at the
+       bottom of the popup regardless of how tall the content above is. */
+    flex:0 0 auto;
 
 }
 

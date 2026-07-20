@@ -441,3 +441,102 @@ matching the intended design.
   tile; confirmed a Stale tile's revealed content no longer contains
   the old hardcoded message and instead contains the new Name +
   Description block under a "Tile Info" heading.
+
+---
+
+## Entry 7 — Modal layout fix + Time Warp bug fix
+
+### Files changed
+
+- `gnite/index.html`
+- `gnite/style.css`
+- `gnite/js/ui/popup.js`
+
+### Issue 1: popup buttons pushed off-screen (layout)
+
+**Fix.** Wrapped the popup's question/answer/timer content in a new
+`#popupScrollArea` div (sibling of `#popupButtons`, both direct
+children of `#popupBox`). `.popupBox` is now a capped-height
+(`max-height:90vh`) flex column; `#popupScrollArea` is `flex:1 1 auto`
+with `overflow-y:auto` and `min-height:0` (required -- without it a
+flex child won't shrink below its content's natural height, which
+would silently defeat the scrolling); `.popupButtons` is
+`flex:0 0 auto`, so it never shrinks and never scrolls out of view.
+This is the standard "scrollable body, pinned footer, capped total
+height" modal pattern. No text was shortened, no content was removed,
+no font sizes were changed.
+
+**Verification.** Installed `jsdom` temporarily (removed afterward,
+not committed) to parse the real `index.html` and confirm the actual
+DOM tree: `popupButtons` is a sibling of `popupScrollArea`, not nested
+inside it (this is what makes it exempt from the scrolling and
+pinnable via flex); all six popup buttons still exist and are still
+inside `popupButtons`; `popupQuestion`/`popupAnswer`/`timerArea` are
+all correctly inside `popupScrollArea`. CSS brace balance and HTML
+div-tag balance were also checked. This confirms the structure is
+correct; it does not confirm actual pixel-level rendering, since this
+environment has no real browser -- see note below.
+
+### Issue 2: Time Warp had no visible effect
+
+**Root cause (confirmed by tracing the exact code path, not
+guessed).** `Timer.remaining` and `Timer.updateDisplay()` were both
+being correctly read/written by `EventExecutor.timeWarp()` -- the
+suspicion that it was "modifying a value the live countdown doesn't
+use" turned out not to be the mechanism, though the underlying
+category of problem (data change with no visible effect) was right.
+The actual cause: `Popup._resolveTile()` called
+`EventExecutor.execute()` (which halves the timer and writes the new
+value to the DOM), then *immediately*, in the same synchronous
+continuation, called `Board.markUsed()` -> `Score.nextPlayer()` ->
+`this.close()` -> `Timer.stop()`. There was no yield point between the
+DOM write and the popup being hidden, so the browser never got a
+chance to paint the halved value before it was hidden by `display:none`
+-- the data was correct, but visually nothing appeared to change. This
+isn't specific to Time Warp; any event that visibly changes shared UI
+right before a tile resolves would hit the same gap.
+
+**Fix.** Inserted a single `await` on a double-`requestAnimationFrame`
+promise in `_resolveTile()`, between `EventExecutor.execute()` and
+`Board.markUsed()`. Two animation frames reliably guarantees at least
+one paint has occurred in between (a well-established technique for
+this exact problem), at a cost of roughly 1/30th of a second --
+imperceptible to a host, but enough for the browser to actually render
+the change. Fixed at the shared resolution path (not special-cased for
+Time Warp specifically), since the gap was generic.
+
+**Verification.** Built a Node simulation that loads the *actual,
+unmodified* `timer.js` and the *actual, fixed* `popup.js`, runs
+`Timer.start()` with a real 1-second `setInterval` for 2.5 real
+seconds, then resolves a tile carrying a `TIME_WARP` event and traces
+every call in order. Confirmed: the timer was at `remaining=3` when
+resolved; Time Warp correctly computed `floor(3/2)=1` and wrote it to
+the mock DOM; `requestAnimationFrame` was invoked twice (confirming a
+real async gap existed) *before* `Board.markUsed()` /
+`Score.nextPlayer()` / `close()` / `Timer.stop()` ran. Then, for
+contrast, ran the same trace against the actual pre-fix `popup.js`
+(pulled from the previous commit) and confirmed it had *zero* yield
+points between the DOM write and `close()` -- pure synchronous
+continuation, reproducing the reported bug exactly.
+
+### A limitation worth being explicit about
+
+This sandbox has no real browser -- verification for both issues was
+done via DOM-structure parsing (jsdom) and execution-order/timing
+simulation (Node, with `requestAnimationFrame` mocked onto the real
+event loop), not by literally watching a rendered page. This is strong
+evidence the fixes are structurally and mechanically correct, but a
+quick manual check in an actual browser (resize the window narrow
+enough to force scrolling on a Mixed tile with a long question; trigger
+a Time Warp mid-countdown and watch the number visibly drop) is still
+worth doing before tonight, since it's the one thing this environment
+genuinely cannot confirm.
+
+### Known issues
+
+- None found beyond the one above (which is a verification-method
+  limitation, not a known code issue).
+
+### Deferred work / technical debt
+
+- None introduced by this entry.
