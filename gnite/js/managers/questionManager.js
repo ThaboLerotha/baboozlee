@@ -15,9 +15,12 @@ const QuestionManager = {
 
     },
 
+    // Swapping in a future pack (v2, a themed pack, etc.) is a
+    // one-line change here plus updating the <script> tag in
+    // index.html -- nothing else in QuestionManager needs to change.
     reset() {
 
-        this.availableQuestions = [...QuestionDatabase];
+        this.availableQuestions = [...QuestionPackV1.questions];
 
         this.shuffle(this.availableQuestions);
 

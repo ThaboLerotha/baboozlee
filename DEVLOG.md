@@ -540,3 +540,84 @@ genuinely cannot confirm.
 ### Deferred work / technical debt
 
 - None introduced by this entry.
+
+---
+
+## Entry 8 — Content integration: QuestionPack_v1
+
+### Files changed
+
+- `gnite/content/questions/QuestionPack_v1.js` (new -- the uploaded pack)
+- `gnite/js/managers/questionManager.js`
+- `gnite/index.html`
+
+### What changed
+
+**The uploaded file was truncated.** It ended mid-structure with no
+closing `]`/`}` for the `questions` array/outer object, so it failed
+`node --check` as-is. All 250 questions themselves were intact (ids
+1-250 present, matching the pack's own `totalQuestions: 250`) -- only
+the closing syntax at the very end was missing, almost certainly an
+upload/copy artifact rather than a content problem. Appended the
+missing `]` `};` and re-verified it parses. This isn't a content
+critique (the questions themselves were left untouched, per
+instruction) -- it was a structural fix required before the file could
+be loaded at all.
+
+**`QuestionManager.reset()`** now builds `availableQuestions` from
+`QuestionPackV1.questions` instead of the old flat `QuestionDatabase`
+array. Every other method (`getQuestion()`, `shuffle()`,
+`initialize()`) is untouched -- the public API is identical to before.
+Swapping in a future pack is a one-line change to this one reference
+plus the `<script>` tag below.
+
+**`index.html`** now loads `content/questions/QuestionPack_v1.js`
+instead of `js/data/questionDatabase.js`.
+
+**`js/data/questionDatabase.js` (the old 40-question file) was left in
+the repo but is no longer loaded anywhere** -- same treatment as
+`powerups.js` from earlier: dead, not deleted, flagged here so nobody
+mistakes it for the active database. Confirmed nothing else in the
+codebase references the `QuestionDatabase` global anymore.
+
+### Architecture note
+
+The pack's `type` field uses `"true_false"` instead of the old file's
+`"truefalse"`, and adds a `tags` array the old format didn't have.
+Neither required an adapter -- `question.type` is never actually read
+anywhere in the codebase (confirmed by search), and an extra unused
+`tags` field on each question object is harmless. No format
+adaptation was needed beyond fixing the truncation.
+
+### Known issues
+
+- None in the integration itself. The source pack's truncation was
+  fixed as described above.
+
+### Future hooks added
+
+- None new -- `QuestionManager`'s public API is unchanged, so nothing
+  else needed to change to point at a different pack in the future.
+
+### Deferred work / technical debt
+
+- `js/data/questionDatabase.js` (old 40-question file) is now dead
+  code, same status as `powerups.js`. Neither has been deleted.
+
+### Verification performed
+
+- Fixed the truncated pack, then confirmed via `node --check` that it
+  parses.
+- Programmatic check on the pack: `questions.length` matches the
+  declared `totalQuestions` (250), all 250 ids unique, every question
+  has `category`/`question`/`answer`/`explanation`, no duplicate
+  question text.
+- Full syntax sweep across every JS file including the new
+  `content/questions/` folder.
+- DOM-id cross-reference check after the `index.html` script-tag swap.
+- Ran the actual `QuestionManager` against the real, fixed pack
+  end-to-end: drew all 250 questions with zero duplicates, confirmed
+  the exhausted pool returns `null` with a warning, confirmed `reset()`
+  rebuilds and reshuffles a fresh 250-question pool for a new game.
+- Confirmed via search that nothing else in the codebase still
+  references the old `QuestionDatabase` global.
