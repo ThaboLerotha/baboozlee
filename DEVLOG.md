@@ -621,3 +621,136 @@ adaptation was needed beyond fixing the truncation.
   rebuilds and reshuffles a fresh 250-question pool for a new game.
 - Confirmed via search that nothing else in the codebase still
   references the old `QuestionDatabase` global.
+
+---
+
+## Entry 9 — Contract System (framework only, no content)
+
+Scope: architecture only, per instruction. Does not implement any of
+the ~25 real contracts -- only the pipeline and two placeholder
+entries used to prove it end-to-end.
+
+### Files changed
+
+- `gnite/js/data/contractDatabase.js` (new)
+- `gnite/js/managers/contractManager.js` (new)
+- `gnite/index.html`
+- `gnite/js/ui/ui.js`
+- `gnite/js/engine/app.js`
+- `gnite/js/ui/popup.js`
+- `gnite/js/managers/score.js`
+- `gnite/style.css`
+
+### Architecture
+
+**`contractDatabase.js`** follows the same `key`/`name`/`description`
+pattern as `eventDatabase.js`. Each entry also has `category`
+(`"starting"` or `"optional"`), a `type` string, a generic numeric
+`target`, and a `reward` object. Contains two placeholder entries
+only (`EXAMPLE_STARTING_PLACEHOLDER`, `EXAMPLE_OPTIONAL_PLACEHOLDER`),
+clearly commented as not-real-content.
+
+**`contractManager.js`** owns all contract state internally, keyed by
+`player.id` -- it does not add any fields to player objects, so
+`players.js` was not touched at all. Key design decision: contract
+*type* logic is never hardcoded inside `ContractManager`. Instead,
+`ContractManager.registerType(typeKey, handler)` lets any future file
+register a handler for a new `type` value; `ContractManager` just
+looks up `typeHandlers[def.type]` and calls `handler.onHook(...)` --
+it has no `if/else` chain over contract types anywhere. Verified this
+actually works by registering a brand-new type at runtime in the test
+suite and confirming its handler received a hook, without editing
+`ContractManager`'s own code.
+
+Definitions vs. instances: assigning a contract copies `target` from
+the database entry onto a fresh instance object
+(`{instanceId, contractId, playerId, status, progress, target}`).
+Editing a database entry later can't retroactively change a contract
+a player is already partway through.
+
+**Every public method starts with `if(!this.enabled) return;`.** This
+is what makes "leave existing gameplay unchanged when disabled"
+actually true rather than just intended -- confirmed by a regression
+test that calls every hook with contracts disabled and checks zero
+state was created.
+
+### Integration points (the "smallest set of files" from inspection)
+
+- `ui.js`: `startGameBtn`'s handler reads the new `#contractsEnabled`
+  checkbox and sets `ContractManager.enabled` before calling
+  `ContractManager.startGame()`. Placed alongside the existing
+  `Players.createPlayers()` / `QuestionManager.reset()` / `Board.build()`
+  sequence -- no reordering of existing calls.
+- `app.js`: `ContractManager.initialize()` added alongside the other
+  managers' initialization, guarded with `typeof ContractManager !==
+  "undefined"` for defensive consistency with how `Timer` is already
+  guarded elsewhere in the codebase.
+- `popup.js`: `_resolveTile()` gained one parameter (`outcome`, a
+  string like `"correct"`/`"wrong"`/`"pass"`/`"continue"`) and one
+  guarded call to `ContractManager.onTileResolved()`. No other change
+  to tile-resolution behavior.
+- `score.js`: `addPoints()`/`subtractPoints()` each gained one guarded
+  call to `ContractManager.onScoreChange()`. `nextPlayer()` captures
+  the ending player's id before advancing and fires
+  `ContractManager.onTurnEnd()` for that player once advancement is
+  done (not fired on the early-return bonus-turn path, since that's
+  the same player continuing, not a turn actually ending).
+- `index.html`: new `#contractsEnabled` checkbox on the Setup screen
+  (defaults unchecked/off), new `#contractPanel` aside next to
+  `#scoreboard` (starts hidden), two new `<script>` tags.
+
+### UI placeholder
+
+`ContractManager.renderPanel()` is intentionally minimal -- lists each
+player with active/completed/failed contracts and a raw
+`progress/target` count. It proves contracts are visible to the host;
+it is not a finished design. Hidden entirely (and never populated)
+when contracts are disabled.
+
+### Known issues
+
+- None found. See verification below.
+
+### Future hooks added
+
+- `ContractManager.registerType()` is the extension point for every
+  future contract type -- confirmed working via the runtime
+  registration test.
+- `offerOptionalContract(playerId)` is a complete, working, tested
+  pipeline, but nothing calls it yet -- deciding *when* during a game
+  an Optional Contract should be offered is a gameplay/UX decision left
+  for a future phase, not assumed here.
+
+### Deferred work / technical debt
+
+- Only 2 placeholder contract definitions exist. The real content (up
+  to 25 contracts, per the milestone) is future work, likely following
+  the same content-generation split used for the question pack
+  (ChatGPT generates the data file, this integrates it).
+- No automatic trigger exists yet for offering Optional Contracts
+  during play.
+- `renderPanel()`'s presentation is a placeholder, not a final design.
+
+### Verification performed
+
+- Full syntax sweep across every JS file, including the two new files.
+- CSS brace balance and HTML div-tag balance checks after the
+  `index.html`/`style.css` edits.
+- DOM-id cross-reference check (confirms `contractsEnabled` and
+  `contractPanel` are correctly wired on both sides, and nothing else
+  broke).
+- A standalone 8-group functional simulation of `ContractManager`
+  covering: disabled = true no-op (including calling all three hooks
+  and confirming zero state change); Starting Contracts assigned to
+  every player; the Optional Contract offer pipeline; progress
+  tracking with automatic completion at target; fail-state tracking;
+  `getActiveContracts()` correctly excluding completed/failed;
+  point-reward payout on completion; and runtime registration of a
+  brand-new contract type whose handler correctly receives hooks
+  without any change to `ContractManager`'s own code.
+- A second simulation loading the *actual* `popup.js` end-to-end (not
+  a reimplementation) confirming a real tile resolution: (a) with
+  contracts disabled, resolves exactly as before with zero
+  `ContractManager` state created; (b) with contracts enabled, the
+  `tileResolved` hook reaches a registered handler with the correct
+  `playerId` and `outcome`.

@@ -108,6 +108,18 @@
 
         </div>
 
+        <br>
+
+        <label>
+
+            <input type="checkbox" id="contractsEnabled">
+
+            Enable Contracts (Beta)
+
+        </label>
+
+        <br><br>
+
         <button id="startGameBtn">
             Start Game
         </button>
@@ -140,6 +152,10 @@
             </div>
 
             <aside id="scoreboard">
+
+            </aside>
+
+            <aside id="contractPanel" class="hidden">
 
             </aside>
 
@@ -248,6 +264,7 @@
 <!-- DATA -->
 <script src="content/questions/QuestionPack_v1.js"></script>
 <script src="js/data/eventDatabase.js"></script>
+<script src="js/data/contractDatabase.js"></script>
 
 <!-- MANAGERS -->
 <script src="js/managers/questionManager.js"></script>
@@ -256,6 +273,7 @@
 <script src="js/managers/boardGenerator.js"></script>
 <script src="js/managers/timer.js"></script>
 <script src="js/managers/score.js"></script>
+<script src="js/managers/contractManager.js"></script>
 
 <!-- ENGINE -->
 <script src="js/engine/app.js"></script>

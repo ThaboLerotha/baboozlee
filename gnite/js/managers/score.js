@@ -107,6 +107,8 @@ const Score = {
 
         let current = GameNight.players[GameNight.currentPlayer];
 
+        const endingPlayerId = current.id;
+
         // Bonus turn
 
         if(current.bonusTurn){
@@ -157,6 +159,16 @@ const Score = {
 
         }
 
+        if(typeof ContractManager !== "undefined"){
+
+            ContractManager.onTurnEnd({
+
+                playerId: endingPlayerId
+
+            });
+
+        }
+
         this.update();
 
     },
@@ -175,13 +187,43 @@ const Score = {
 
         player.score+=points;
 
+        if(typeof ContractManager !== "undefined"){
+
+            ContractManager.onScoreChange({
+
+                playerId: player.id,
+
+                delta: points,
+
+                newScore: player.score
+
+            });
+
+        }
+
         this.update();
 
     },
 
     subtractPoints(points){
 
-        GameNight.players[GameNight.currentPlayer].score-=points;
+        const player = GameNight.players[GameNight.currentPlayer];
+
+        player.score-=points;
+
+        if(typeof ContractManager !== "undefined"){
+
+            ContractManager.onScoreChange({
+
+                playerId: player.id,
+
+                delta: -points,
+
+                newScore: player.score
+
+            });
+
+        }
 
         this.update();
 

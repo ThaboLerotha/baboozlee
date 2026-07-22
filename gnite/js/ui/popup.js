@@ -387,13 +387,18 @@ ${infoBlock}
     // Shared by correct()/wrong()/continueEvent()/pass(): every path
     // that resolves a tile fires its event, marks it used, and advances
     // the turn the same way. Only whether points are awarded differs.
-    async _resolveTile(awardPoints) {
+    // `outcome` is passed through to ContractManager's hook untouched --
+    // popup.js doesn't need to know what, if anything, a contract does
+    // with it.
+    async _resolveTile(awardPoints, outcome) {
 
         const tile = GameNight.board.find(
 
             t => t.id === this.currentTile
 
         );
+
+        const resolvingPlayer = Players.getCurrentPlayer();
 
         if(awardPoints){
 
@@ -431,6 +436,20 @@ ${infoBlock}
 
         });
 
+        if(typeof ContractManager !== "undefined"){
+
+            ContractManager.onTileResolved({
+
+                playerId: resolvingPlayer.id,
+
+                tileId: tile.id,
+
+                outcome: outcome
+
+            });
+
+        }
+
         Board.markUsed(this.currentTile);
 
         Score.nextPlayer();
@@ -441,13 +460,13 @@ ${infoBlock}
 
     async correct() {
 
-        await this._resolveTile(true);
+        await this._resolveTile(true, "correct");
 
     },
 
     async wrong() {
 
-        await this._resolveTile(false);
+        await this._resolveTile(false, "wrong");
 
     },
 
@@ -458,7 +477,7 @@ ${infoBlock}
     // its event is now firing.
     async continueEvent() {
 
-        await this._resolveTile(false);
+        await this._resolveTile(false, "continue");
 
     },
 
@@ -480,7 +499,7 @@ ${infoBlock}
 
         Score.update();
 
-        await this._resolveTile(false);
+        await this._resolveTile(false, "pass");
 
     }
 

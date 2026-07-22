@@ -33,6 +33,12 @@ const GameNight = {
 
 EventManager.initialize();
 
+if(typeof ContractManager !== "undefined"){
+
+    ContractManager.initialize();
+
+}
+
 UI.initialize();
 
 console.log("Game Night Engine Loaded");

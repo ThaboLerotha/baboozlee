@@ -51,6 +51,16 @@ const UI = {
 
                 GameNight.currentPlayer = 0;
 
+                if(typeof ContractManager !== "undefined"){
+
+                    const contractsCheckbox = document.getElementById("contractsEnabled");
+
+                    ContractManager.enabled = !!(contractsCheckbox && contractsCheckbox.checked);
+
+                    ContractManager.startGame();
+
+                }
+
                 QuestionManager.reset();
 
                 Board.build();

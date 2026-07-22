@@ -332,6 +332,32 @@ main{
 
 }
 
+#contractPanel{
+
+    flex:1;
+
+    background:#2b2e3b;
+
+    border-radius:15px;
+
+    padding:20px;
+
+    min-width:280px;
+
+}
+
+#contractPanel h3{
+
+    margin-top:15px;
+
+    margin-bottom:5px;
+
+    font-size:16px;
+
+    color:#aaa;
+
+}
+
 .scorePlayer{
 
     display:flex;
