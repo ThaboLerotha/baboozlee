@@ -754,3 +754,112 @@ when contracts are disabled.
   `ContractManager` state created; (b) with contracts enabled, the
   `tileResolved` hook reaches a registered handler with the correct
   `playerId` and `outcome`.
+
+---
+
+## Entry 10 — First 25 production contracts
+
+Content only. `ContractManager` was not modified -- confirmed via
+`git diff` showing zero changes to that file before committing.
+
+### Files changed
+
+- `gnite/js/data/contractDatabase.js` (replaced the 2 framework
+  placeholders with 25 real contracts)
+- `gnite/js/managers/contractTypes.js` (new)
+- `gnite/index.html` (one new `<script>` tag)
+
+### Design decisions made before writing any content
+
+**Avoided contracts tied to a specific board event.** Which event
+types even appear on a given board is random (`BoardGenerator` rolls
+tile type per-tile; `EventManager` draws from a shuffled pool where
+most events have only 1-2 copies). A contract requiring, say, "trigger
+a Meteor" could be mathematically impossible in a given game. This
+directly violates "contracts are always achievable," so none of the 25
+reference a specific event.
+
+**Avoided "avoid-doing-X-until-the-game-ends" contracts.** There's no
+game-end hook in `ContractManager` (only `onTileResolved`/
+`onScoreChange`/`onTurnEnd` exist). Adding one would be exactly the
+kind of `ContractManager` change the instructions said to avoid unless
+truly necessary -- so this batch simply doesn't include that pattern,
+rather than forcing an architecture change for it.
+
+**Calibrated every target assuming a normal-sized game, not the
+extreme end of the player range.** The game supports 2-20 players
+sharing one 30-tile board, so per-player turn count varies enormously
+-- a 20-player game could give some players as few as 1 turn total.
+Matched the instruction's own "achievable over the course of a normal
+game" phrasing rather than the worst-case player count; targets are
+kept modest (mostly 1-6) specifically because of this. Documented here
+as an explicit assumption rather than silently designed around.
+
+### The 8 contract types (in `contractTypes.js`)
+
+`countOutcome`, `turnsPlayed`, `scoreThreshold`, `singleTileScore`,
+`countAboveThreshold`, `correctStreak`, `scoreAndCorrectCombo`,
+`passAndCorrectCombo`. Each registered via
+`ContractManager.registerType()` -- none required touching
+`ContractManager` itself. The two combo types are worth calling out:
+rather than checking their compound condition and calling
+`completeContract()` directly, each condition becoming newly true
+increments progress by 1 toward a target of 2 via the normal
+`updateProgress()` path -- so `ContractManager`'s existing "progress
+reaches target -> auto-complete" logic handles completion naturally,
+and the placeholder panel shows meaningful partial progress (e.g.
+`1/2`) instead of nothing.
+
+**Streak design note:** a wrong answer resets `correctStreak` to zero;
+Pass and Continue are neutral and don't break it. This was a
+deliberate choice so a strategic Pass on a question the player doesn't
+know doesn't cost them contract progress -- it creates the kind of
+"interesting decision" the brief asked for rather than punishing
+appropriate use of an existing mechanic.
+
+### Balance
+
+10 Easy / 10 Medium / 5 Hard, as requested. 10 Starting / 15 Optional.
+Easy contracts complete in effectively 1 action (answer once, pass
+once, reach a modest score). Medium raises counts modestly (2-4) or
+adds a compound condition. Hard raises counts further (4-6) or raises
+score/single-tile thresholds, without ever requiring double-digit
+repetitions.
+
+### Known issues
+
+- None found. See verification below.
+
+### Deferred work / technical debt
+
+- Nothing new introduced by this entry. The two items already noted in
+  Entry 9 (no automatic Optional Contract offer trigger; placeholder
+  panel presentation) remain unchanged.
+
+### Verification performed
+
+- Full syntax sweep across every JS file including the two new/changed
+  files.
+- Confirmed via `git diff --stat` on `contractManager.js` that it has
+  zero changes.
+- DOM-id cross-reference check after the `index.html` script-tag
+  addition.
+- Structural check on the database: exactly 25 contracts, ids exactly
+  1-25 with no gaps or duplicates, all keys unique, every contract has
+  every required field, every `category` is `starting` or `optional`,
+  every `type` referenced has a registered handler in
+  `ContractManager.typeHandlers`, and difficulty distribution is
+  exactly 10 Easy / 10 Medium / 5 Hard.
+- Functional simulation covering all 8 types against the real 25-entry
+  database: confirmed Starting Contracts are assigned to every player
+  (10 each); confirmed `countOutcome`, `turnsPlayed`, `scoreThreshold`,
+  and `singleTileScore` each complete correctly at their target;
+  confirmed `correctStreak` does NOT complete early on a partial
+  streak, correctly resets to 0 on a wrong answer, and correctly
+  treats a Pass as neutral (doesn't break an in-progress streak);
+  confirmed `countAboveThreshold` requires the qualifying gain to
+  happen the specified number of separate times, not just once;
+  confirmed both combo types track partial progress correctly (1/2
+  after only one condition is met) and complete only once both
+  conditions are satisfied, in either order; confirmed the generic
+  `failContract()` still works correctly against the new content.
