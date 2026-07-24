@@ -39,6 +39,12 @@ if(typeof ContractManager !== "undefined"){
 
 }
 
+if(typeof HistoryManager !== "undefined"){
+
+    HistoryManager.initialize();
+
+}
+
 UI.initialize();
 
 console.log("Game Night Engine Loaded");

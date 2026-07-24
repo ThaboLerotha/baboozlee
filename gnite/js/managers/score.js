@@ -169,6 +169,42 @@ const Score = {
 
         }
 
+        if(typeof HistoryManager !== "undefined"){
+
+            const endingPlayer = GameNight.players.find(
+
+                p => p.id === endingPlayerId
+
+            );
+
+            if(endingPlayer){
+
+                HistoryManager.record(
+
+                    endingPlayerId,
+
+                    "Turn Ended",
+
+                    `${endingPlayer.name}'s turn ended.`
+
+                );
+
+            }
+
+            HistoryManager.advanceTurn();
+
+            HistoryManager.record(
+
+                current.id,
+
+                "Turn Started",
+
+                `${current.name}'s turn began.`
+
+            );
+
+        }
+
         this.update();
 
     },
@@ -222,6 +258,20 @@ const Score = {
                 newScore: player.score
 
             });
+
+        }
+
+        if(typeof HistoryManager !== "undefined"){
+
+            HistoryManager.record(
+
+                player.id,
+
+                "Points Lost",
+
+                `${player.name} lost ${points} points.`
+
+            );
 
         }
 

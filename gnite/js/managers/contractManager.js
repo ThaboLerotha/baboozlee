@@ -191,6 +191,26 @@ const ContractManager = {
 
         this.assignments[playerId].push(instance);
 
+        if(typeof HistoryManager !== "undefined"){
+
+            const player = GameNight.players.find(p => p.id === playerId);
+
+            if(player){
+
+                HistoryManager.record(
+
+                    playerId,
+
+                    "Contract Assigned",
+
+                    `${player.name} received the contract "${def.name}".`
+
+                );
+
+            }
+
+        }
+
         return instance;
 
     },
@@ -241,6 +261,28 @@ const ContractManager = {
 
         }
 
+        if(typeof HistoryManager !== "undefined"){
+
+            const def = this._getDefinition(instance.contractId);
+
+            const player = GameNight.players.find(p => p.id === playerId);
+
+            if(def && player){
+
+                HistoryManager.record(
+
+                    playerId,
+
+                    "Contract Progress Updated",
+
+                    `${player.name} made progress on "${def.name}" (${instance.progress}/${instance.target}).`
+
+                );
+
+            }
+
+        }
+
         this.renderPanel();
 
     },
@@ -287,6 +329,32 @@ const ContractManager = {
 
         }
 
+        if(typeof HistoryManager !== "undefined"){
+
+            const completingPlayer = GameNight.players.find(p => p.id === playerId);
+
+            if(def && completingPlayer){
+
+                const rewardText = (def.reward && def.reward.points)
+
+                    ? ` (+${def.reward.points} points)`
+
+                    : "";
+
+                HistoryManager.record(
+
+                    playerId,
+
+                    "Contract Completed",
+
+                    `${completingPlayer.name} completed "${def.name}"${rewardText}.`
+
+                );
+
+            }
+
+        }
+
         this.renderPanel();
 
     },
@@ -310,6 +378,28 @@ const ContractManager = {
         instance.status = "failed";
 
         instance.failReason = reason || null;
+
+        if(typeof HistoryManager !== "undefined"){
+
+            const def = this._getDefinition(instance.contractId);
+
+            const player = GameNight.players.find(p => p.id === playerId);
+
+            if(def && player){
+
+                HistoryManager.record(
+
+                    playerId,
+
+                    "Contract Failed",
+
+                    `${player.name} failed "${def.name}".`
+
+                );
+
+            }
+
+        }
 
         this.renderPanel();
 

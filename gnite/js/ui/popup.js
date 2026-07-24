@@ -400,9 +400,68 @@ ${infoBlock}
 
         const resolvingPlayer = Players.getCurrentPlayer();
 
+        // Captured before Score.addPoints() runs, because addPoints()
+        // reads AND clears doublePoints internally -- and because a
+        // contract reward can be awarded synchronously as a side
+        // effect of this same call (via ContractManager's onScoreChange
+        // hook), which would contaminate a simple before/after score
+        // delta. Computing the tile's own contribution directly avoids
+        // double-counting points that already get their own separate
+        // "Contract Completed" entry.
+        const wasDoubled = resolvingPlayer.doublePoints;
+
         if(awardPoints){
 
             Score.addPoints(tile.points);
+
+        }
+
+        if(typeof HistoryManager !== "undefined"){
+
+            if(outcome === "correct"){
+
+                const tileContribution = wasDoubled ? tile.points * 2 : tile.points;
+
+                HistoryManager.record(
+
+                    resolvingPlayer.id,
+
+                    "Answered Correctly",
+
+                    `${resolvingPlayer.name} answered correctly (+${tileContribution} points).`
+
+                );
+
+            } else if(outcome === "wrong"){
+
+                HistoryManager.record(
+
+                    resolvingPlayer.id,
+
+                    "Answered Incorrectly",
+
+                    `${resolvingPlayer.name} answered incorrectly.`
+
+                );
+
+            } else if(outcome === "pass"){
+
+                HistoryManager.record(
+
+                    resolvingPlayer.id,
+
+                    "Pass Used",
+
+                    `${resolvingPlayer.name} used a Pass.`
+
+                );
+
+            }
+
+            // outcome === "continue" (pure Event tile) intentionally
+            // records nothing here -- there was no question to answer.
+            // What actually happens is covered by the Event Activated/
+            // Event Outcome entries EventExecutor records below.
 
         }
 

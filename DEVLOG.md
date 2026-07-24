@@ -863,3 +863,128 @@ repetitions.
   after only one condition is met) and complete only once both
   conditions are satisfied, in either order; confirmed the generic
   `failContract()` still works correctly against the new content.
+
+---
+
+## Entry 11 — Game History Log
+
+### Files changed
+
+- `gnite/js/managers/historyManager.js` (new)
+- `gnite/index.html`
+- `gnite/style.css`
+- `gnite/js/ui/ui.js`
+- `gnite/js/engine/app.js`
+- `gnite/js/managers/score.js`
+- `gnite/js/ui/popup.js`
+- `gnite/js/managers/eventExecutor.js`
+- `gnite/js/managers/contractManager.js`
+
+### Architecture
+
+`HistoryManager` contains no gameplay logic -- every other system
+constructs its own human-readable title/description text and calls
+the single generic `HistoryManager.record(playerId, title,
+description)`. The only other public "structural" methods are
+`advanceTurn()` (the relative, in-game clock entries are stamped with
+-- not real time) and `open()`/`close()`/`render()` for the read-only
+viewer. No calling system ever touches the DOM directly for history
+display; they only ever call `record()`.
+
+Every hook call site follows the same `typeof HistoryManager !==
+"undefined"` guard already used throughout this codebase for
+`ContractManager`/`Timer`, so History is a safe no-op if the file
+somehow failed to load.
+
+### Where each required entry type is actually produced
+
+| Entry type | Where |
+|---|---|
+| Turn started | `ui.js` (very first turn) and `score.js`'s `nextPlayer()` (every subsequent turn) |
+| Answered correctly / incorrectly | `popup.js`'s `_resolveTile()` |
+| Points gained | `eventExecutor.js` (Steal's gaining side, Gift's receiving side) and `contractManager.js`'s `completeContract()` (reward payout) |
+| Points lost | `score.js`'s `subtractPoints()` (its only caller is Bomb Self) and folded into `eventExecutor.js`'s outcome text for Bomb Other/Steal's losing side/Gift's giving side |
+| Pass used | `popup.js`'s `_resolveTile()` |
+| Event activated | `eventExecutor.js`'s `execute()`, one hook covering all 15 event types uniformly |
+| Event outcome | `eventExecutor.js`, one call per handler (13 of 14 -- Bomb Self relies on `subtractPoints`'s own hook instead of a redundant second entry) |
+| Contract assigned | `contractManager.js`'s `_assign()` -- the single point both Starting and Optional assignment funnel through |
+| Contract accepted / declined | **Not wired to any real code path** -- see note below |
+| Contract progress updated | `contractManager.js`'s `updateProgress()`, skipped specifically on the increment that also completes the contract (avoids a redundant entry next to Completed) |
+| Contract completed | `contractManager.js`'s `completeContract()` |
+| Contract failed | `contractManager.js`'s `failContract()` |
+| Turn ended | `score.js`'s `nextPlayer()` |
+
+Neither "Turn Ended"/"Turn Started" nor Contract-hook recording fires
+on the bonus-turn early-return path in `nextPlayer()` -- consistent
+with `ContractManager.onTurnEnd()`'s existing behavior, which already
+treats a bonus turn as a continuation, not a new turn.
+
+### Honest gap: Contract Accepted / Contract Declined
+
+There's no accept/decline flow anywhere in the game -- confirmed via
+search, zero matches. `offerOptionalContract()` (from Entry 9) still
+has no automatic trigger and, even when called, assigns a contract
+directly with no accept/decline step at all. `HistoryManager.record()`
+is fully generic and can represent these two entry types the moment
+that flow exists, but there's genuinely nothing to hook into yet. Not
+invented here, since building an accept/decline flow would be Contract
+System work, out of scope for a History feature.
+
+### A real bug this feature's own testing caught (in new code, not
+pre-existing)
+
+The first version of `_resolveTile()`'s "Answered Correctly" entry
+computed the point figure as `player.score` before vs. after
+`Score.addPoints()`. Since a Contract reward can be awarded
+synchronously as a side effect of that same call (via
+`ContractManager`'s `onScoreChange` hook, which can trigger
+`completeContract()` mid-call), that before/after delta could include
+points that already get their own separate "Contract Completed"
+entry -- e.g. a 200-point tile that also completes a 100-point reward
+contract showed "Answered Correctly (+300 points)" instead of +200,
+double-counting the same 100 points across two log lines. Fixed by
+computing the tile's own contribution directly (`tile.points`, doubled
+if Double Points was active, captured before `Score.addPoints()` runs)
+instead of trusting a score snapshot that other systems can
+legitimately mutate in between. Caught by the integration test before
+committing, not after.
+
+### Known issues
+
+- None beyond the documented Contract Accepted/Declined gap above.
+
+### Deferred work / technical debt
+
+- Cleanup/Bad Jackpot's Event Outcome entries are generic ("removed a
+  hidden event from the board") rather than naming the specific event
+  removed. `Board.convertRandomEventTiles()` clears `tile.event` before
+  returning the affected tiles, so the name isn't recoverable without
+  modifying `Board`'s own methods, which was out of scope ("Do NOT
+  modify Board generation").
+- Contract Accepted/Declined, as noted above.
+
+### Verification performed
+
+- Full syntax sweep across every JS file.
+- CSS brace balance and HTML div-tag balance checks.
+- DOM-id cross-reference check.
+- A 10-part integration test loading the real `historyManager.js`,
+  `board.js`, `eventExecutor.js`, `score.js`, `contractDatabase.js`,
+  `contractManager.js`, `contractTypes.js`, and `popup.js` together
+  (not reimplementations) and driving them through actual `Popup.open()
+  -> reveal() -> correct()/wrong()/pass()` calls:
+  - Isolated (contracts disabled): confirmed exactly one entry each
+    for a correct answer (with the precise point figure), a wrong
+    answer, a Pass, a Double-Points-affected correct answer (reporting
+    the doubled amount correctly), and a Bomb Self event (exactly one
+    Event Activated + one Points Lost entry, with exactly correct
+    final score math) -- no duplicates in any case.
+  - Enabled: confirmed Contract Assigned fires exactly once per
+    starting contract per player (20 for a 2-player game with 10
+    starting contracts), confirmed Contract Completed/Progress Updated
+    entries appear when a correct answer cascades into contract
+    completion, confirmed Contract Failed fires correctly.
+  - Confirmed sequence numbers are strictly increasing with no gaps or
+    duplicates across a 33-entry run mixing every entry type together.
+  - Confirmed `open()`/`close()` correctly toggle visibility and that
+    rendered HTML shows the newest entry before the oldest.

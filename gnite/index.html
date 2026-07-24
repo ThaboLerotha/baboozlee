@@ -151,9 +151,15 @@
 
             </div>
 
-            <aside id="scoreboard">
+            <div id="scoreboardColumn">
 
-            </aside>
+                <button id="historyBtn">📜 History</button>
+
+                <aside id="scoreboard">
+
+                </aside>
+
+            </div>
 
             <aside id="contractPanel" class="hidden">
 
@@ -257,6 +263,36 @@
 
 </div>
 
+<!-- HISTORY -->
+
+<div id="historyWindow" class="hidden">
+
+    <div id="historyBox">
+
+        <div id="historyScrollArea">
+
+            <h2>Game History</h2>
+
+            <div id="historyList">
+
+            </div>
+
+        </div>
+
+        <div id="historyButtons">
+
+            <button id="closeHistoryBtn">
+
+                Close
+
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
 
 <!-- ==========================================
      JAVASCRIPT
@@ -275,6 +311,7 @@
 <script src="js/managers/score.js"></script>
 <script src="js/managers/contractManager.js"></script>
 <script src="js/managers/contractTypes.js"></script>
+<script src="js/managers/historyManager.js"></script>
 
 <!-- ENGINE -->
 <script src="js/engine/app.js"></script>

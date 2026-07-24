@@ -51,6 +51,26 @@ const UI = {
 
                 GameNight.currentPlayer = 0;
 
+                if(typeof HistoryManager !== "undefined"){
+
+                    HistoryManager.initialize();
+
+                    HistoryManager.advanceTurn();
+
+                    const firstPlayer = Players.getCurrentPlayer();
+
+                    HistoryManager.record(
+
+                        firstPlayer.id,
+
+                        "Turn Started",
+
+                        `${firstPlayer.name}'s turn began.`
+
+                    );
+
+                }
+
                 if(typeof ContractManager !== "undefined"){
 
                     const contractsCheckbox = document.getElementById("contractsEnabled");
@@ -228,6 +248,50 @@ const UI = {
         } else {
 
             console.error("closeBtn not found");
+
+        }
+
+        // -----------------------------
+        // HISTORY
+        // -----------------------------
+
+        const historyBtn = document.getElementById("historyBtn");
+
+        if (historyBtn) {
+
+            historyBtn.addEventListener("click", () => {
+
+                if(typeof HistoryManager !== "undefined"){
+
+                    HistoryManager.open();
+
+                }
+
+            });
+
+        } else {
+
+            console.error("historyBtn not found");
+
+        }
+
+        const closeHistoryBtn = document.getElementById("closeHistoryBtn");
+
+        if (closeHistoryBtn) {
+
+            closeHistoryBtn.addEventListener("click", () => {
+
+                if(typeof HistoryManager !== "undefined"){
+
+                    HistoryManager.close();
+
+                }
+
+            });
+
+        } else {
+
+            console.error("closeHistoryBtn not found");
 
         }
 

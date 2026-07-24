@@ -24,6 +24,22 @@ const EventExecutor = {
 
         }
 
+        if(typeof HistoryManager !== "undefined"){
+
+            const activatingPlayer = Players.getCurrentPlayer();
+
+            HistoryManager.record(
+
+                activatingPlayer.id,
+
+                "Event Activated",
+
+                `${activatingPlayer.name} activated ${event.name}.`
+
+            );
+
+        }
+
         switch(event.key){
 
             case "BOMB_SELF":
@@ -143,6 +159,20 @@ const EventExecutor = {
 
     },
 
+    // Records what an event actually did, distinct from the generic
+    // "Event Activated" entry execute() already records. Guarded the
+    // same way every other HistoryManager call site in this codebase
+    // is, so this is a safe no-op if History isn't loaded.
+    recordOutcome(playerId, description){
+
+        if(typeof HistoryManager !== "undefined"){
+
+            HistoryManager.record(playerId, "Event Outcome", description);
+
+        }
+
+    },
+
     // =========================================
     // Self Events
     // =========================================
@@ -155,7 +185,11 @@ const EventExecutor = {
 
     doublePoints(tile){
 
-        Players.getCurrentPlayer().doublePoints = true;
+        const player = Players.getCurrentPlayer();
+
+        player.doublePoints = true;
+
+        this.recordOutcome(player.id, `${player.name}'s next points will be doubled.`);
 
         Score.update();
 
@@ -163,7 +197,11 @@ const EventExecutor = {
 
     bonusTurn(tile){
 
-        Players.getCurrentPlayer().bonusTurn = true;
+        const player = Players.getCurrentPlayer();
+
+        player.bonusTurn = true;
+
+        this.recordOutcome(player.id, `${player.name} will take another turn.`);
 
         Score.update();
 
@@ -171,7 +209,11 @@ const EventExecutor = {
 
     shield(tile){
 
-        Players.getCurrentPlayer().shield = true;
+        const player = Players.getCurrentPlayer();
+
+        player.shield = true;
+
+        this.recordOutcome(player.id, `${player.name} is now shielded from the next negative effect.`);
 
         Score.update();
 
@@ -203,6 +245,8 @@ const EventExecutor = {
 
         if(this.consumeShieldIfPresent(target)){
 
+            this.recordOutcome(target.id, `${target.name}'s shield blocked a Bomb.`);
+
             Score.update();
 
             return;
@@ -210,6 +254,8 @@ const EventExecutor = {
         }
 
         target.score -= 200;
+
+        this.recordOutcome(target.id, `${target.name} lost 200 points to a Bomb.`);
 
         Score.update();
 
@@ -237,6 +283,8 @@ const EventExecutor = {
 
         if(this.consumeShieldIfPresent(target)){
 
+            this.recordOutcome(target.id, `${target.name}'s shield blocked a Freeze.`);
+
             Score.update();
 
             return;
@@ -244,6 +292,8 @@ const EventExecutor = {
         }
 
         target.skipTurns += 1;
+
+        this.recordOutcome(target.id, `${target.name} will skip their next turn.`);
 
         Score.update();
 
@@ -271,6 +321,8 @@ const EventExecutor = {
 
         if(this.consumeShieldIfPresent(target)){
 
+            this.recordOutcome(target.id, `${target.name}'s shield blocked a Steal.`);
+
             Score.update();
 
             return;
@@ -279,9 +331,19 @@ const EventExecutor = {
 
         const amount = 150;
 
+        const thief = Players.getCurrentPlayer();
+
         target.score -= amount;
 
-        Players.getCurrentPlayer().score += amount;
+        thief.score += amount;
+
+        this.recordOutcome(
+
+            thief.id,
+
+            `${thief.name} stole ${amount} points from ${target.name}.`
+
+        );
 
         Score.update();
 
@@ -317,6 +379,14 @@ const EventExecutor = {
 
         target.score += amount;
 
+        this.recordOutcome(
+
+            giver.id,
+
+            `${giver.name} gave ${amount} points to ${target.name}.`
+
+        );
+
         Score.update();
 
     },
@@ -333,7 +403,17 @@ const EventExecutor = {
     // rest of the board worth more on average.
     jackpot(tile){
 
-        Board.removeLowValueTiles(3);
+        const removed = Board.removeLowValueTiles(3);
+
+        const player = Players.getCurrentPlayer();
+
+        this.recordOutcome(
+
+            player.id,
+
+            `Jackpot removed ${removed.length} low-value tile(s) from the board.`
+
+        );
 
     },
 
@@ -341,7 +421,17 @@ const EventExecutor = {
     // turning them into ordinary stale/question tiles.
     badJackpot(tile){
 
-        Board.convertRandomEventTiles(3);
+        const converted = Board.convertRandomEventTiles(3);
+
+        const player = Players.getCurrentPlayer();
+
+        this.recordOutcome(
+
+            player.id,
+
+            `Bad Jackpot converted ${converted.length} hidden event tile(s) into ordinary tiles.`
+
+        );
 
     },
 
@@ -350,7 +440,17 @@ const EventExecutor = {
     // reliable.
     chaos(tile){
 
-        Board.shuffleHiddenEvents(tile.id);
+        const shuffled = Board.shuffleHiddenEvents(tile.id);
+
+        const player = Players.getCurrentPlayer();
+
+        this.recordOutcome(
+
+            player.id,
+
+            `Chaos shuffled ${shuffled.length} hidden event(s) around the board.`
+
+        );
 
     },
 
@@ -358,7 +458,26 @@ const EventExecutor = {
     // random event-bearing tile.
     cleanup(tile){
 
-        Board.convertRandomEventTiles(1);
+        const converted = Board.convertRandomEventTiles(1);
+
+        const player = Players.getCurrentPlayer();
+
+        // Board.convertRandomEventTiles() already clears the tile's
+        // event before returning, so the specific event that was
+        // removed isn't recoverable here without modifying Board's
+        // own methods -- out of scope for this feature. The count is
+        // still accurate.
+        this.recordOutcome(
+
+            player.id,
+
+            converted.length > 0
+
+                ? "Cleanup removed a hidden event from the board."
+
+                : "Cleanup found no hidden events to remove."
+
+        );
 
     },
 
@@ -366,7 +485,17 @@ const EventExecutor = {
     // revealing them. Rare and severe by design.
     meteor(tile){
 
-        Board.destroyRandomTiles(0.30, tile.id);
+        const destroyed = Board.destroyRandomTiles(0.30, tile.id);
+
+        const player = Players.getCurrentPlayer();
+
+        this.recordOutcome(
+
+            player.id,
+
+            `Meteor destroyed ${destroyed.length} tile(s) on the board.`
+
+        );
 
     },
 
@@ -378,6 +507,8 @@ const EventExecutor = {
     // in half, raising urgency. If no timer is running there is nothing to
     // warp.
     timeWarp(tile){
+
+        const player = Players.getCurrentPlayer();
 
         if(typeof Timer !== "undefined" && Timer.running){
 
@@ -391,9 +522,13 @@ const EventExecutor = {
 
             Timer.updateDisplay();
 
+            this.recordOutcome(player.id, "Time Warp cut the remaining time in half.");
+
         } else {
 
             console.log("Time Warp: no active timer to affect.");
+
+            this.recordOutcome(player.id, "Time Warp found no active timer to affect.");
 
         }
 
@@ -405,11 +540,15 @@ const EventExecutor = {
     // effects.
     noEscape(tile){
 
-        GameNight.players.forEach(player => {
+        const player = Players.getCurrentPlayer();
 
-            player.shield = false;
+        GameNight.players.forEach(p => {
+
+            p.shield = false;
 
         });
+
+        this.recordOutcome(player.id, "No Escape removed every player's shield.");
 
         Score.update();
 
