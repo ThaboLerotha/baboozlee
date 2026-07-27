@@ -988,3 +988,233 @@ committing, not after.
     duplicates across a 33-entry run mixing every entry type together.
   - Confirmed `open()`/`close()` correctly toggle visibility and that
     rendered HTML shows the newest entry before the oldest.
+
+---
+
+## Entry 12 — Version 1.0 Milestone 1: Core Gameplay Completion
+
+Six parts, approved by design review before implementation began (per
+the project's established workflow: inspect, propose architecture,
+get sign-off, then build).
+
+### Files changed
+
+- `gnite/js/managers/contractManager.js`
+- `gnite/js/data/contractDatabase.js`
+- `gnite/js/ui/contractOffer.js` (new)
+- `gnite/js/managers/eventExecutor.js`
+- `gnite/js/game/board.js`
+- `gnite/js/ui/popup.js`
+- `gnite/js/managers/gameEndManager.js` (new)
+- `gnite/js/engine/app.js`
+- `gnite/js/ui/ui.js`
+- `gnite/index.html`
+- `gnite/style.css`
+- Deleted: `gnite/js/game/powerups.js`, `gnite/js/data/questionDatabase.js`
+
+### Part 1 — Contract System revision
+
+`assignStartingContracts()` now gives each player exactly one random
+Starting Contract instead of all 10 -- the previous behavior was
+closer to an Achievement system (everyone gets everything) than a
+Contract system (you're given one, and can earn a second).
+`ContractManager.maxActiveContracts = 2` caps how many a player can
+hold at once.
+
+### Part 2 — Optional Contract engine
+
+**Design decision made before implementing, per review feedback:**
+rejected a flat random-chance-per-turn trigger in favor of a
+content-driven trigger framework. Contracts in the database can now
+carry a `trigger` key (`null` for the 25 general-pool ones from
+Entry 10); `ContractManager.checkTrigger(triggerKey, playerId)` looks
+up whichever contract declares that key and offers *that specific
+contract* -- never a random pick -- the moment the condition is met.
+Adding a new trigger later means adding a database entry with a new
+`trigger` key plus whatever gameplay code calls `checkTrigger()` with
+it; `ContractManager`'s own code never needs a new case.
+
+5 new trigger-linked contracts (ids 26-30), each reusing an
+already-tested contract type rather than inventing new mechanics:
+`FIRST_BOMB_SURVIVED`, `FIRST_SHIELD_USED`, `FIRST_PASS_USED`,
+`FIRST_EVENT_TRIGGERED`, `FIRST_MIXED_TILE_OPENED`. Each trigger
+resolves at most once per player, and is marked resolved the moment
+its condition is met even if the 2-contract cap prevents an offer
+from actually being shown (a trigger firing twice for the same player
+would misrepresent "first X").
+
+New `js/ui/contractOffer.js` -- an Accept/Decline modal mirroring
+`targetSelector.js`'s self-building DOM pattern rather than inventing
+another UI framework. Accepting reuses the existing `_assign()`
+pipeline (not replaced); declining just records History. Both paths
+close the loop on the two entry types from Entry 11 that had no real
+trigger before now -- "Contract Accepted"/"Contract Declined" are
+real gameplay events for the first time.
+
+**One interpretation call worth flagging:** `FIRST_MIXED_TILE_OPENED`
+was originally planned to check in `Popup.open()` (literally "opened"),
+but that would mean showing a contract-offer interrupt *before* the
+host even sees the tile's question -- inconsistent with every other
+trigger, which fires after an action completes. Moved the check into
+`_resolveTile()` instead, firing after the tile resolves rather than
+before it's engaged with.
+
+### Part 3 — True Stale Tile engine
+
+`Board.build()` no longer calls `QuestionManager.getQuestion()` for a
+stale tile -- it fixes a real pre-existing bug, not just a display
+issue: stale tiles were silently wasting a question from the shared
+pool for no reason. `Popup.open()` has a dedicated early-return branch
+for `tile.isStale`: no timer, no Pass (nothing to gamble on), no
+Reveal step (nothing to reveal), Continue available immediately.
+`Board.convertTilesToStale()` (the Cleanup/Bad Jackpot conversion
+path) now unconditionally clears `tile.question` instead of only
+backfilling one when missing -- a Mixed tile converted to Stale
+becomes genuinely empty, not "stale but keeps its old question."
+
+Renamed `Popup.isPureEventTile` to `Popup.noQuestionTile` (now covers
+both pure Event and true Stale tiles, since both skip Correct/Wrong in
+favor of Continue) plus a new `isTrueStaleTile` flag to distinguish
+which specific content to render.
+
+### Part 4 — Legacy cleanup
+
+Removed the now-dead old stale-rendering branch and the
+`STALE_TILE_INFO` fallback constant from `popup.js` (unreachable once
+true Stale tiles return early in their own branch). Deleted
+`powerups.js` and the old `questionDatabase.js` -- both had been
+flagged as confirmed-dead in earlier entries (Entry 8/9) and were
+re-confirmed via search immediately before deletion, per "remove
+legacy code only after confirming it is genuinely obsolete."
+
+### Part 5 — Game End engine
+
+**Architecture correction applied before implementing, per review
+feedback:** `GameEndManager` is the single authority over the end of
+the game. `Board.markUsed()`/`markTilesUsed()` only call
+`GameEndManager.checkBoardExhausted()` -- a pure notification, no
+decision-making in Board itself. The check is "does any unused tile
+remain" (`GameNight.board.every(t => t.used)`, evaluated fresh every
+time), not a hardcoded tile count -- confirmed via search that no
+`=== 30` assumption exists anywhere. This means a Stale tile consumed
+instantly, or Meteor/Jackpot consuming several tiles in bulk, are
+treated identically to a tile answered normally: the board doesn't
+care *how* a tile became used, only whether any remain unused.
+
+Winner/tie detection, the End Game window (🏆 winner, ranked final
+scoreboard, per-player Game Summary), and New Game/Return Home are all
+owned here, leaving an obvious place for Awards/Disses to slot in
+later without restructuring anything.
+
+**Statistics are derived entirely from `HistoryManager.entries`, not
+new counters** -- approved during design review as the cleaner
+architecture. Every required stat (Questions Answered, Correct, Wrong,
+Accuracy, Events Triggered, Contracts Completed, Passes Used) is a
+filter over existing History titles per player. Zero new
+instrumentation anywhere in the codebase; nothing can drift out of
+sync with the log because there's nothing parallel to drift from.
+
+"New Game" (same players, skips Home/Setup) resets each player's
+mutable state and calls the same `ContractManager.startGame()` /
+`QuestionManager.reset()` / `Board.build()` sequence Setup already
+uses. "Return Home" goes to the actual `homeScreen` (a third screen
+that existed already, distinct from Setup).
+
+**A real bug caught by this feature's own testing:**
+`ContractManager.startGame()` reset `assignments` and `nextInstanceId`
+but never `firedTriggers`. A "New Game" with the same players would
+have silently carried over which triggers had already resolved from
+the *previous* game, permanently blocking them from ever firing again
+in the replay. Fixed by resetting `firedTriggers` in `startGame()`
+too, since both the normal Start-Game flow and the New-Game-from-
+End-Game flow call it.
+
+### Part 6 — Sudden Death
+
+Only tied players participate; no board tiles, no events, no contract
+progress, no real points -- confirmed by the smoke test that real
+scores are untouched by an entire Sudden Death sequence. Reuses
+`QuestionManager.getQuestion()` directly. Resolution is round-based:
+every tied player answers once per round; if exactly one player holds
+the highest correct-count once the round completes, they win;
+otherwise another round begins. Verified against the exact example
+from the brief (A correct, B correct, A wrong, B correct -> B wins)
+and it resolves precisely that way.
+
+**Deliberate exception, flagged rather than silently made:** if the
+shared question pool is exhausted mid-tiebreak, Sudden Death resets it
+rather than stalling. This breaks the established "never reshuffle
+mid-game" rule from Entry 3, justified because "Sudden Death must
+always resolve a winner" is a harder requirement than question
+uniqueness once the main game is already over.
+
+History records "Sudden Death Started," one "Sudden Death Answer" per
+question, and "Sudden Death Winner."
+
+### Known issues
+
+- None found. See verification below.
+
+### Future hooks added
+
+- `GameEndManager`'s End Game window has an obvious insertion point
+  for Awards/Disses (next milestone, per the requesting message) --
+  they'd slot into `showEndGameWindow()`'s flow without restructuring
+  anything else.
+- The trigger framework (`checkTrigger()` + database `trigger` field)
+  is ready for more V1-style triggers to be added as pure content,
+  with no engine changes.
+
+### Deferred work / technical debt
+
+- The 25 general-pool Optional Contracts from Entry 10 (no `trigger`
+  value) currently have no path back into the game -- the old
+  random-offer mechanism (`offerOptionalContract()`, still present and
+  unit-tested) is no longer called by anything real now that offers
+  are trigger-driven. Not retrofitted with triggers here, since that
+  wasn't asked for and is a content-design decision, not an
+  engineering one -- flagged for a future conversation rather than
+  decided unilaterally.
+- Awards and Disses are explicitly next-milestone, per the requesting
+  message -- not started.
+
+### Verification performed
+
+- Full syntax sweep across every JS file after every part.
+- CSS brace balance and HTML div-tag balance checks after every
+  `index.html`/`style.css` change.
+- DOM-id cross-reference check (the only "missing" ids are the two
+  Sudden Death buttons, which are built dynamically via `innerHTML`,
+  same as every other dynamic modal in this codebase).
+- Confirmed via `grep` that `powerups.js` and the old
+  `questionDatabase.js` were genuinely unreferenced before deleting
+  them, and that no file assumes a hardcoded tile count anywhere.
+- A 7-part functional test for Parts 1-3: exactly one random Starting
+  Contract per player; a trigger firing exactly once per player and
+  respecting the 2-contract cap (while still marking itself resolved
+  when capped); Accept and Decline paths both producing the correct
+  History entry; a true Stale tile drawing zero questions from the
+  pool; `Popup.open()` on Stale showing Continue immediately with no
+  Reveal/Pass/Timer; resolving a Stale tile producing no "Answered"
+  entry; `convertTilesToStale()` clearing an existing question.
+- A 6-part functional test for Parts 5-6 loading the real files
+  together: single-winner detection the moment (and only the moment)
+  no unused tiles remain, independent of tile count; a tie correctly
+  triggering Sudden Death instead of a draw; Sudden Death resolving
+  exactly per the brief's own documented example; confirmed real
+  player scores are untouched by Sudden Death; confirmed the question
+  pool resets rather than stalling if exhausted mid-tiebreak.
+- A follow-up 3-part test: stats correctly derived from real History
+  entries (spot-checked exact counts and a rounded accuracy
+  percentage) with no separate counters anywhere; a zero-answers edge
+  case producing `null` accuracy rather than `NaN`; "New Game"
+  correctly resetting scores, `gameEnded`, and (after the bug fix)
+  `firedTriggers`, while keeping the same player identities and
+  jumping straight to the game screen.
+- A full end-to-end smoke test: built an actual 30-tile board with
+  Contracts and all systems enabled, played every tile to completion
+  (alternating Correct/Wrong, auto-accepting contract offers,
+  resolving Stale/Event tiles via Continue) with zero thrown errors,
+  reached the End Game window correctly, and confirmed History's 98
+  recorded entries across the whole run had strictly increasing
+  sequence numbers with no duplicates or gaps.

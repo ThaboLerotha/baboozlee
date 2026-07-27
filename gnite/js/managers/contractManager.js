@@ -36,6 +36,15 @@ const ContractManager = {
     // handler.onHook(instance, definition, hookName, payload, ContractManager)
     typeHandlers: {},
 
+    // playerId -> Set of trigger keys already resolved for that player
+    // (fired exactly once each, whether or not an offer could actually
+    // be shown -- see checkTrigger()).
+    firedTriggers: {},
+
+    // The maximum number of contracts (Starting + Optional combined) a
+    // player may have active at once.
+    maxActiveContracts: 2,
+
     initialize() {
 
         this.enabled = false;
@@ -43,6 +52,8 @@ const ContractManager = {
         this.assignments = {};
 
         this.nextInstanceId = 1;
+
+        this.firedTriggers = {};
 
         // A minimal built-in type, registered here purely to prove the
         // registry pattern works end-to-end. It does nothing on any
@@ -81,6 +92,8 @@ const ContractManager = {
 
         this.nextInstanceId = 1;
 
+        this.firedTriggers = {};
+
         if(!this.enabled){
 
             this.renderPanel();
@@ -101,6 +114,10 @@ const ContractManager = {
 
     },
 
+    // Each player gets exactly ONE random Starting Contract, not the
+    // whole set. Combined with the max-2-active-contracts rule, that
+    // leaves room for a second, Optional Contract to be earned during
+    // play (see checkTrigger()).
     assignStartingContracts() {
 
         if(!this.enabled){
@@ -115,13 +132,21 @@ const ContractManager = {
 
         );
 
+        if(startingDefs.length === 0){
+
+            return;
+
+        }
+
         GameNight.players.forEach(player => {
 
-            startingDefs.forEach(def => {
+            const randomDef = startingDefs[
 
-                this._assign(player.id, def);
+                Math.floor(Math.random() * startingDefs.length)
 
-            });
+            ];
+
+            this._assign(player.id, randomDef);
 
         });
 
@@ -162,6 +187,115 @@ const ContractManager = {
         this.renderPanel();
 
         return instance;
+
+    },
+
+    // Content-driven Optional Contract triggers. A gameplay moment
+    // calls this with a trigger key (e.g. "FIRST_BOMB_SURVIVED"); if a
+    // contract in the database declares that same `trigger` value, and
+    // this player hasn't already resolved this trigger, and they have
+    // room for another active contract, the host is shown an
+    // Accept/Decline offer for that specific contract. Adding a new
+    // trigger later is a database change (a new optional contract with
+    // a new `trigger` key) plus whatever gameplay code calls
+    // checkTrigger() with that key -- this method never needs a new
+    // case added for it.
+    async checkTrigger(triggerKey, playerId) {
+
+        if(!this.enabled){
+
+            return;
+
+        }
+
+        if(!this.firedTriggers[playerId]){
+
+            this.firedTriggers[playerId] = new Set();
+
+        }
+
+        if(this.firedTriggers[playerId].has(triggerKey)){
+
+            return;
+
+        }
+
+        // Resolved for this player the moment the condition is met,
+        // regardless of whether an offer can actually be shown below --
+        // "first X" only ever happens once per player.
+        this.firedTriggers[playerId].add(triggerKey);
+
+        if(this.getActiveContracts(playerId).length >= this.maxActiveContracts){
+
+            return;
+
+        }
+
+        const def = ContractDatabase.find(
+
+            d => d.category === "optional" && d.trigger === triggerKey
+
+        );
+
+        if(!def){
+
+            return;
+
+        }
+
+        const player = GameNight.players.find(p => p.id === playerId);
+
+        if(!player){
+
+            return;
+
+        }
+
+        if(typeof ContractOffer === "undefined"){
+
+            return;
+
+        }
+
+        const accepted = await new Promise(resolve => {
+
+            ContractOffer.open(def, () => resolve(true), () => resolve(false));
+
+        });
+
+        if(accepted){
+
+            this._assign(playerId, def);
+
+            if(typeof HistoryManager !== "undefined"){
+
+                HistoryManager.record(
+
+                    playerId,
+
+                    "Contract Accepted",
+
+                    `${player.name} accepted the contract "${def.name}".`
+
+                );
+
+            }
+
+        } else if(typeof HistoryManager !== "undefined"){
+
+            HistoryManager.record(
+
+                playerId,
+
+                "Contract Declined",
+
+                `${player.name} declined the contract "${def.name}".`
+
+            );
+
+        }
+
+        this.renderPanel();
 
     },
 

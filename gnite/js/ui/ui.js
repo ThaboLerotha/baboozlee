@@ -51,6 +51,12 @@ const UI = {
 
                 GameNight.currentPlayer = 0;
 
+                if(typeof GameEndManager !== "undefined"){
+
+                    GameEndManager.initialize();
+
+                }
+
                 if(typeof HistoryManager !== "undefined"){
 
                     HistoryManager.initialize();
@@ -292,6 +298,54 @@ const UI = {
         } else {
 
             console.error("closeHistoryBtn not found");
+
+        }
+
+        // -----------------------------
+        // END GAME
+        // -----------------------------
+
+        const endGameNewGameBtn = document.getElementById("endGameNewGameBtn");
+
+        if (endGameNewGameBtn) {
+
+            endGameNewGameBtn.addEventListener("click", () => {
+
+                if(typeof GameEndManager !== "undefined"){
+
+                    GameEndManager.newGameWithSamePlayers();
+
+                }
+
+            });
+
+        } else {
+
+            console.error("endGameNewGameBtn not found");
+
+        }
+
+        const endGameReturnHomeBtn = document.getElementById("endGameReturnHomeBtn");
+
+        if (endGameReturnHomeBtn) {
+
+            endGameReturnHomeBtn.addEventListener("click", () => {
+
+                const win = document.getElementById("endGameWindow");
+
+                if(win){
+
+                    win.classList.add("hidden");
+
+                }
+
+                this.show("home");
+
+            });
+
+        } else {
+
+            console.error("endGameReturnHomeBtn not found");
 
         }
 

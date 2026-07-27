@@ -838,3 +838,343 @@ main{
     cursor:pointer;
 
 }
+
+/* ===========================================
+   CONTRACT OFFER
+=========================================== */
+
+#contractOffer{
+
+    position:fixed;
+
+    top:0;
+    left:0;
+
+    width:100%;
+    height:100%;
+
+    background:rgba(0,0,0,.75);
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    z-index:10000;
+
+}
+
+#contractOffer.hidden{
+
+    display:none;
+
+}
+
+.contractOfferBox{
+
+    width:450px;
+
+    max-width:90%;
+
+    background:white;
+
+    color:black;
+
+    border-radius:18px;
+
+    padding:35px;
+
+    text-align:center;
+
+    box-shadow:0 15px 50px rgba(0,0,0,.5);
+
+}
+
+.contractOfferBox h3{
+
+    margin-top:15px;
+
+    color:#4CAF50;
+
+}
+
+.contractOfferButtons{
+
+    display:flex;
+
+    justify-content:center;
+
+    gap:20px;
+
+    margin-top:25px;
+
+}
+
+.contractOfferButtons button{
+
+    height:50px;
+
+    padding:0 25px;
+
+    border:none;
+
+    border-radius:10px;
+
+    font-size:16px;
+
+    cursor:pointer;
+
+    transition:.2s;
+
+}
+
+.contractOfferButtons button:first-child{
+
+    background:#4CAF50;
+
+    color:white;
+
+}
+
+.contractOfferButtons button:last-child{
+
+    background:#eee;
+
+}
+
+.contractOfferButtons button:hover{
+
+    transform:scale(1.03);
+
+}
+
+/* ===========================================
+   END GAME
+=========================================== */
+
+#endGameWindow{
+
+    position:fixed;
+
+    top:0;
+    left:0;
+
+    width:100%;
+    height:100%;
+
+    background:rgba(0,0,0,.85);
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    z-index:10000;
+
+}
+
+#endGameWindow.hidden{
+
+    display:none;
+
+}
+
+#endGameBox{
+
+    width:700px;
+
+    max-width:92%;
+
+    max-height:90vh;
+
+    background:white;
+
+    color:black;
+
+    border-radius:18px;
+
+    padding:35px;
+
+    text-align:left;
+
+    box-shadow:0 15px 50px rgba(0,0,0,.5);
+
+    display:flex;
+
+    flex-direction:column;
+
+}
+
+#endGameScrollArea{
+
+    overflow-y:auto;
+
+    flex:1 1 auto;
+
+    min-height:0;
+
+}
+
+#endGameButtons{
+
+    display:flex;
+
+    justify-content:center;
+
+    gap:20px;
+
+    margin-top:25px;
+
+    padding-top:20px;
+
+    border-top:1px solid rgba(0,0,0,.1);
+
+    flex:0 0 auto;
+
+}
+
+#endGameButtons button{
+
+    height:50px;
+
+    padding:0 25px;
+
+    border:none;
+
+    border-radius:10px;
+
+    font-size:16px;
+
+    cursor:pointer;
+
+    background:#3a3d4d;
+
+    color:white;
+
+}
+
+#endGameButtons button:hover{
+
+    background:#4a4d5f;
+
+}
+
+.endGameTable{
+
+    width:100%;
+
+    border-collapse:collapse;
+
+    margin-top:10px;
+
+    font-size:14px;
+
+}
+
+.endGameTable th, .endGameTable td{
+
+    padding:8px 10px;
+
+    text-align:left;
+
+    border-bottom:1px solid rgba(0,0,0,.1);
+
+}
+
+/* ===========================================
+   SUDDEN DEATH
+=========================================== */
+
+#suddenDeathWindow{
+
+    position:fixed;
+
+    top:0;
+    left:0;
+
+    width:100%;
+    height:100%;
+
+    background:rgba(0,0,0,.85);
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    z-index:10001;
+
+}
+
+#suddenDeathWindow.hidden{
+
+    display:none;
+
+}
+
+#suddenDeathBox{
+
+    width:500px;
+
+    max-width:90%;
+
+    background:white;
+
+    color:black;
+
+    border-radius:18px;
+
+    padding:35px;
+
+    text-align:center;
+
+    box-shadow:0 15px 50px rgba(0,0,0,.5);
+
+}
+
+#suddenDeathButtons{
+
+    display:flex;
+
+    justify-content:center;
+
+    gap:20px;
+
+    margin-top:25px;
+
+}
+
+#suddenDeathButtons button{
+
+    height:50px;
+
+    padding:0 25px;
+
+    border:none;
+
+    border-radius:10px;
+
+    font-size:16px;
+
+    cursor:pointer;
+
+}
+
+#suddenDeathButtons button:first-child{
+
+    background:#4CAF50;
+
+    color:white;
+
+}
+
+#suddenDeathButtons button:last-child{
+
+    background:#e57373;
+
+    color:white;
+
+}

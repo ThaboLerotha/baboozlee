@@ -45,6 +45,12 @@ if(typeof HistoryManager !== "undefined"){
 
 }
 
+if(typeof GameEndManager !== "undefined"){
+
+    GameEndManager.initialize();
+
+}
+
 UI.initialize();
 
 console.log("Game Night Engine Loaded");

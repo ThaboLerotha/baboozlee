@@ -40,6 +40,14 @@ const EventExecutor = {
 
         }
 
+        if(typeof ContractManager !== "undefined"){
+
+            const activatingPlayer = Players.getCurrentPlayer();
+
+            await ContractManager.checkTrigger("FIRST_EVENT_TRIGGERED", activatingPlayer.id);
+
+        }
+
         switch(event.key){
 
             case "BOMB_SELF":
@@ -59,7 +67,7 @@ const EventExecutor = {
                 break;
 
             case "SHIELD":
-                this.shield(tile);
+                await this.shield(tile);
                 break;
 
             case "FREEZE":
@@ -207,7 +215,7 @@ const EventExecutor = {
 
     },
 
-    shield(tile){
+    async shield(tile){
 
         const player = Players.getCurrentPlayer();
 
@@ -216,6 +224,12 @@ const EventExecutor = {
         this.recordOutcome(player.id, `${player.name} is now shielded from the next negative effect.`);
 
         Score.update();
+
+        if(typeof ContractManager !== "undefined"){
+
+            await ContractManager.checkTrigger("FIRST_SHIELD_USED", player.id);
+
+        }
 
     },
 
@@ -248,6 +262,12 @@ const EventExecutor = {
             this.recordOutcome(target.id, `${target.name}'s shield blocked a Bomb.`);
 
             Score.update();
+
+            if(typeof ContractManager !== "undefined"){
+
+                await ContractManager.checkTrigger("FIRST_BOMB_SURVIVED", target.id);
+
+            }
 
             return;
 

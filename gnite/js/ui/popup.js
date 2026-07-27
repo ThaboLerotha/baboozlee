@@ -5,28 +5,17 @@ Version 1.2
 =========================================
 */
 
-// Stale tiles have no real event (tile.event.type stays "none" on
-// purpose -- see Board.convertTilesToStale()), so they can't pull a
-// name/description from EventDatabase without pretending to be a real,
-// targetable event. This local, display-only info object lets the
-// popup render them with the same Name + Description visual pattern
-// as everything else, without touching the actual event system.
-const STALE_TILE_INFO = {
-
-    name: "Stale Tile",
-
-    description: "No special effects. This tile is only worth its points."
-
-};
-
 const Popup = {
 
     currentTile: null,
 
-    // Set in open(), read by reveal(): pure Event tiles have no question
-    // to judge, so Correct/Wrong never apply to them -- only Continue
-    // (see continueEvent()) and, until reveal, Pass.
-    isPureEventTile: false,
+    // Set in open(), read by reveal(): tiles with nothing to answer
+    // (pure Event tiles and true Stale tiles) never show Correct/Wrong
+    // -- only Continue (see continueEvent()) and, until reveal, Pass
+    // (Stale tiles skip Pass too -- see open()).
+    noQuestionTile: false,
+
+    isTrueStaleTile: false,
 
     open(tileID) {
 
@@ -40,7 +29,9 @@ const Popup = {
 
         const hasRealEvent = tile.event && tile.event.type !== "none";
 
-        this.isPureEventTile = tile.tileType === "event";
+        this.isTrueStaleTile = !!tile.isStale;
+
+        this.noQuestionTile = tile.tileType === "event" || this.isTrueStaleTile;
 
         // Reset timer
 
@@ -90,7 +81,7 @@ const Popup = {
         // dodging what it turns out to contain.
         const passBtn = document.getElementById("passBtn");
 
-        if(Players.getCurrentPlayer().passesRemaining > 0){
+        if(!this.isTrueStaleTile && Players.getCurrentPlayer().passesRemaining > 0){
 
             passBtn.classList.remove("hidden");
 
@@ -100,13 +91,13 @@ const Popup = {
 
         }
 
-        // Pure Event tiles have no timer.
+        // Pure Event tiles and true Stale tiles have no timer.
 
         const startBtn = document.getElementById("startTimerBtn");
 
         const timerDisplay = document.getElementById("timerDisplay");
 
-        const showTimer = !this.isPureEventTile;
+        const showTimer = !this.noQuestionTile;
 
         if(startBtn){
 
@@ -121,10 +112,49 @@ const Popup = {
         }
 
         // =====================================
+        // TRUE STALE TILE
+        // =====================================
+        // No question, no event, no timer, no answer, no explanation --
+        // just an empty tile. No Reveal step either, since there's
+        // nothing to reveal; Continue is available immediately.
+
+        if(this.isTrueStaleTile){
+
+            document
+                .getElementById("revealAnswerBtn")
+                .classList.add("hidden");
+
+            document
+                .getElementById("continueBtn")
+                .classList.remove("hidden");
+
+            document
+                .getElementById("popupQuestion")
+                .innerHTML = `
+
+<h2>Tile ${tile.label}</h2>
+
+<hr><br>
+
+<h2>🌫️ STALE TILE</h2>
+
+<p>This tile is empty. Nothing happens here.</p>
+
+`;
+
+            document
+                .getElementById("popupAnswer")
+                .innerHTML = "";
+
+            return;
+
+        }
+
+        // =====================================
         // EVENT TILE
         // =====================================
 
-        if(this.isPureEventTile){
+        if(tile.tileType === "event"){
 
             document
                 .getElementById("popupQuestion")
@@ -250,10 +280,10 @@ ${eventTeaser}
 
 `;
 
-        // Both real events and Stale tiles render through the same
-        // Name + Description visual pattern -- Stale just pulls its
-        // copy from the local STALE_TILE_INFO constant above instead
-        // of EventDatabase, since it isn't a real, targetable event.
+        // Real events render through the Name + Description visual
+        // pattern. True Stale tiles never reach this section at all --
+        // see the dedicated TRUE STALE TILE branch above, which returns
+        // early.
         let infoBlock = "";
 
         if(hasRealEvent){
@@ -267,20 +297,6 @@ ${eventTeaser}
 <p><strong>${tile.event.name}</strong></p>
 
 <p>${tile.event.description}</p>
-
-`;
-
-        } else if(tile.isStale){
-
-            infoBlock = `
-
-<hr>
-
-<h3>Tile Info</h3>
-
-<p><strong>${STALE_TILE_INFO.name}</strong></p>
-
-<p>${STALE_TILE_INFO.description}</p>
 
 `;
 
@@ -350,7 +366,7 @@ ${infoBlock}
             .getElementById("passBtn")
             .classList.add("hidden");
 
-        if(this.isPureEventTile){
+        if(this.noQuestionTile){
 
             document
                 .getElementById("continueBtn")
@@ -506,6 +522,18 @@ ${infoBlock}
                 outcome: outcome
 
             });
+
+            if(outcome === "pass"){
+
+                await ContractManager.checkTrigger("FIRST_PASS_USED", resolvingPlayer.id);
+
+            }
+
+            if(tile.tileType === "mixed"){
+
+                await ContractManager.checkTrigger("FIRST_MIXED_TILE_OPENED", resolvingPlayer.id);
+
+            }
 
         }
 

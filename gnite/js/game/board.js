@@ -94,10 +94,14 @@ const Board = {
             // -----------------------------
             // STALE TILE
             // -----------------------------
+            // A true Stale Tile has no question, no event, no timer, no
+            // answer, no explanation -- it's simply empty. Previously
+            // this branch still drew a question from the shared pool
+            // for no real reason (wasted a question, then showed it
+            // alongside a "this is stale" note). See Popup.open() for
+            // how it's now rendered.
 
             else if(tileType === "stale"){
-
-                question = QuestionManager.getQuestion();
 
                 isStale = true;
 
@@ -182,6 +186,16 @@ const Board = {
         div.classList.add("used");
 
         div.innerHTML = "✓";
+
+        // Board only reports that a tile was consumed. Whether that
+        // means the game has ended, who won, or what happens next is
+        // entirely GameEndManager's decision -- Board has no opinion
+        // about it.
+        if(typeof GameEndManager !== "undefined"){
+
+            GameEndManager.checkBoardExhausted();
+
+        }
 
     },
 
@@ -272,6 +286,14 @@ const Board = {
 
         });
 
+        // Same notify-only contract as markUsed() -- Jackpot/Meteor can
+        // also be the thing that exhausts the last unused tiles.
+        if(typeof GameEndManager !== "undefined"){
+
+            GameEndManager.checkBoardExhausted();
+
+        }
+
     },
 
     // Strips a tile's event and turns it into an ordinary stale/
@@ -282,11 +304,13 @@ const Board = {
 
         tiles.forEach(tile => {
 
-            if(!tile.question){
-
-                tile.question = QuestionManager.getQuestion();
-
-            }
+            // True Stale Tiles have no question at all -- if this was a
+            // Mixed tile with a question already, it's cleared too, not
+            // kept. Previously this only backfilled a question for
+            // tiles that didn't have one (needed under the old
+            // fake-stale design); that's no longer necessary or
+            // correct.
+            tile.question = null;
 
             tile.event = { type: "none" };
 

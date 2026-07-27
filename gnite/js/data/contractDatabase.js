@@ -57,6 +57,8 @@ const ContractDatabase = [
 
         category: "starting",
 
+        trigger: null,
+
         type: "countOutcome",
 
         target: 1,
@@ -80,6 +82,8 @@ const ContractDatabase = [
         difficulty: "Easy",
 
         category: "starting",
+
+        trigger: null,
 
         type: "countOutcome",
 
@@ -105,6 +109,8 @@ const ContractDatabase = [
 
         category: "starting",
 
+        trigger: null,
+
         type: "turnsPlayed",
 
         target: 1,
@@ -128,6 +134,8 @@ const ContractDatabase = [
         difficulty: "Easy",
 
         category: "starting",
+
+        trigger: null,
 
         type: "scoreThreshold",
 
@@ -153,6 +161,8 @@ const ContractDatabase = [
 
         category: "starting",
 
+        trigger: null,
+
         type: "singleTileScore",
 
         target: 300,
@@ -176,6 +186,8 @@ const ContractDatabase = [
         difficulty: "Easy",
 
         category: "starting",
+
+        trigger: null,
 
         type: "countOutcome",
 
@@ -201,6 +213,8 @@ const ContractDatabase = [
 
         category: "starting",
 
+        trigger: null,
+
         type: "correctStreak",
 
         target: 2,
@@ -224,6 +238,8 @@ const ContractDatabase = [
         difficulty: "Easy",
 
         category: "starting",
+
+        trigger: null,
 
         type: "turnsPlayed",
 
@@ -249,6 +265,8 @@ const ContractDatabase = [
 
         category: "optional",
 
+        trigger: null,
+
         type: "countOutcome",
 
         target: 2,
@@ -272,6 +290,8 @@ const ContractDatabase = [
         difficulty: "Easy",
 
         category: "optional",
+
+        trigger: null,
 
         type: "scoreThreshold",
 
@@ -301,6 +321,8 @@ const ContractDatabase = [
 
         category: "starting",
 
+        trigger: null,
+
         type: "countOutcome",
 
         target: 3,
@@ -324,6 +346,8 @@ const ContractDatabase = [
         difficulty: "Medium",
 
         category: "optional",
+
+        trigger: null,
 
         type: "singleTileScore",
 
@@ -349,6 +373,8 @@ const ContractDatabase = [
 
         category: "optional",
 
+        trigger: null,
+
         type: "correctStreak",
 
         target: 3,
@@ -372,6 +398,8 @@ const ContractDatabase = [
         difficulty: "Medium",
 
         category: "optional",
+
+        trigger: null,
 
         type: "scoreThreshold",
 
@@ -397,6 +425,8 @@ const ContractDatabase = [
 
         category: "starting",
 
+        trigger: null,
+
         type: "turnsPlayed",
 
         target: 3,
@@ -420,6 +450,8 @@ const ContractDatabase = [
         difficulty: "Medium",
 
         category: "optional",
+
+        trigger: null,
 
         type: "countAboveThreshold",
 
@@ -445,6 +477,8 @@ const ContractDatabase = [
 
         category: "optional",
 
+        trigger: null,
+
         type: "countOutcome",
 
         target: 4,
@@ -468,6 +502,8 @@ const ContractDatabase = [
         difficulty: "Medium",
 
         category: "optional",
+
+        trigger: null,
 
         type: "scoreAndCorrectCombo",
 
@@ -493,6 +529,8 @@ const ContractDatabase = [
 
         category: "optional",
 
+        trigger: null,
+
         type: "passAndCorrectCombo",
 
         target: 2,
@@ -516,6 +554,8 @@ const ContractDatabase = [
         difficulty: "Medium",
 
         category: "optional",
+
+        trigger: null,
 
         type: "turnsPlayed",
 
@@ -545,6 +585,8 @@ const ContractDatabase = [
 
         category: "optional",
 
+        trigger: null,
+
         type: "correctStreak",
 
         target: 4,
@@ -568,6 +610,8 @@ const ContractDatabase = [
         difficulty: "Hard",
 
         category: "optional",
+
+        trigger: null,
 
         type: "singleTileScore",
 
@@ -593,6 +637,8 @@ const ContractDatabase = [
 
         category: "optional",
 
+        trigger: null,
+
         type: "scoreThreshold",
 
         target: 800,
@@ -616,6 +662,8 @@ const ContractDatabase = [
         difficulty: "Hard",
 
         category: "optional",
+
+        trigger: null,
 
         type: "countOutcome",
 
@@ -641,6 +689,8 @@ const ContractDatabase = [
 
         category: "optional",
 
+        trigger: null,
+
         type: "countAboveThreshold",
 
         target: 3,
@@ -648,6 +698,147 @@ const ContractDatabase = [
         config: { minDelta: 300 },
 
         reward: { points: 450 }
+
+    },
+
+    // =====================================
+    // TRIGGER-LINKED (5) -- Version 1 trigger set
+    // =====================================
+    //
+    // These are only ever offered by a specific gameplay moment (see
+    // ContractManager.checkTrigger() and contractTriggers.js), never
+    // drawn randomly. Their `trigger` value is the key that unlocks
+    // them. Adding a new trigger later means adding another entry here
+    // with a new `trigger` key, plus registering whatever gameplay
+    // code calls checkTrigger() with it -- no engine changes required.
+
+    {
+
+        id: 26,
+
+        key: "NERVES_OF_STEEL",
+
+        name: "Nerves of Steel",
+
+        description: "Answer 2 more questions correctly.",
+
+        difficulty: "Medium",
+
+        category: "optional",
+
+        trigger: "FIRST_BOMB_SURVIVED",
+
+        type: "countOutcome",
+
+        target: 2,
+
+        config: { outcome: "correct" },
+
+        reward: { points: 200 }
+
+    },
+
+    {
+
+        id: 27,
+
+        key: "FORTRESS",
+
+        name: "Fortress",
+
+        description: "Reach a total score of 400 points.",
+
+        difficulty: "Medium",
+
+        category: "optional",
+
+        trigger: "FIRST_SHIELD_USED",
+
+        type: "scoreThreshold",
+
+        target: 400,
+
+        config: {},
+
+        reward: { points: 250 }
+
+    },
+
+    {
+
+        id: 28,
+
+        key: "SECOND_WIND",
+
+        name: "Second Wind",
+
+        description: "Answer 2 more questions correctly.",
+
+        difficulty: "Medium",
+
+        category: "optional",
+
+        trigger: "FIRST_PASS_USED",
+
+        type: "countOutcome",
+
+        target: 2,
+
+        config: { outcome: "correct" },
+
+        reward: { points: 200 }
+
+    },
+
+    {
+
+        id: 29,
+
+        key: "CHAIN_REACTION",
+
+        name: "Chain Reaction",
+
+        description: "Earn 300 or more points from a single tile.",
+
+        difficulty: "Medium",
+
+        category: "optional",
+
+        trigger: "FIRST_EVENT_TRIGGERED",
+
+        type: "singleTileScore",
+
+        target: 300,
+
+        config: {},
+
+        reward: { points: 250 }
+
+    },
+
+    {
+
+        id: 30,
+
+        key: "TWO_BIRDS",
+
+        name: "Two Birds",
+
+        description: "Reach a total score of 350 points.",
+
+        difficulty: "Medium",
+
+        category: "optional",
+
+        trigger: "FIRST_MIXED_TILE_OPENED",
+
+        type: "scoreThreshold",
+
+        target: 350,
+
+        config: {},
+
+        reward: { points: 200 }
 
     }
 
