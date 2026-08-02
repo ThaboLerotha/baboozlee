@@ -17,6 +17,15 @@ const Players = {
 
         const container = document.getElementById("playerInputs");
 
+        // Capture whatever names are already typed before wiping the
+        // container, so changing the count doesn't force the host to
+        // retype names for players they'd already entered.
+        const existingNames = Array.from(
+
+            document.querySelectorAll(".playerName")
+
+        ).map(input => input.value);
+
         container.innerHTML = "";
 
         for (let i = 1; i <= count; i++) {
@@ -28,6 +37,12 @@ const Players = {
             input.placeholder = "Player " + i + " Name";
 
             input.className = "playerName";
+
+            if(existingNames[i - 1]){
+
+                input.value = existingNames[i - 1];
+
+            }
 
             container.appendChild(input);
 

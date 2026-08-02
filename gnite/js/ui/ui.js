@@ -38,6 +38,35 @@ const UI = {
         }
 
         // -----------------------------
+        // PLAYER COUNT CHANGE
+        // -----------------------------
+        // Root cause of the "only 4 players ever get created" bug:
+        // buildInputs() was only ever called once, when the Setup
+        // screen first opens. Changing the dropdown afterward had no
+        // listener wired to it at all, so the input boxes never
+        // regenerated -- Players.createPlayers() then only ever found
+        // the original 4 inputs still sitting in the DOM, regardless
+        // of what the dropdown showed. Every downstream system (Score,
+        // turn order, Contracts, History, GameEndManager) was already
+        // fully dynamic; only this one listener was missing.
+
+        const playerCountSelect = document.getElementById("playerCount");
+
+        if (playerCountSelect) {
+
+            playerCountSelect.addEventListener("change", () => {
+
+                Players.buildInputs();
+
+            });
+
+        } else {
+
+            console.error("playerCount select not found");
+
+        }
+
+        // -----------------------------
         // START GAME
         // -----------------------------
 

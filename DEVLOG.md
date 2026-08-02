@@ -1218,3 +1218,102 @@ question, and "Sudden Death Winner."
   reached the End Game window correctly, and confirmed History's 98
   recorded entries across the whole run had strictly increasing
   sequence numbers with no duplicates or gaps.
+
+---
+
+## Entry 13 — Milestone 1.5: Stabilization (Parts 1 & 2, in progress)
+
+Parts 3-6 not started yet -- this entry covers Parts 1 and 2 only,
+committed now so the fixes are actually testable rather than sitting
+uncommitted locally.
+
+### Part 1 -- Dynamic Player Count bug
+
+**Root cause, found via a screenshot showing 12 selected in the
+dropdown but only 4 name inputs on screen:** `Players.buildInputs()`
+was only ever called once, from the `newGameBtn` click handler, at
+the moment the Setup screen first opens (while the dropdown still
+showed its default value). There was no `change` listener on
+`#playerCount` at all -- changing the dropdown afterward did nothing.
+`Players.createPlayers()` then only ever found whichever input boxes
+happened to still be in the DOM, which was always 4, regardless of
+what the dropdown showed. Every downstream system (Score, turn order,
+Contracts, History, GameEndManager) was already fully dynamic --
+confirmed by an exhaustive search across every listed system before
+the screenshot arrived, and by direct simulation of `Score.nextPlayer()`
+correctly cycling through 6, 10, and 20 players. The break was
+entirely upstream of all of that, at one missing event listener.
+
+**Files changed:** `js/ui/ui.js` (added the missing `change` listener
+on `#playerCount`, calling `Players.buildInputs()`), `js/game/players.js`
+(`buildInputs()` now preserves already-typed names across a count
+change instead of wiping them, a small closely-related completion so
+the fix doesn't feel jarring in practice).
+
+**Verified:** a DOM simulation faithful enough to exercise the actual
+broken event flow (not just downstream logic, which is what let this
+slip through in earlier testing) reproduced the exact reported
+scenario (open at 4, change to 12, confirm 12 inputs with prior names
+preserved, confirm 12 players created), then separately confirmed all
+five explicitly requested counts -- 2, 4, 6, 10, 20 -- each produce
+the correct number of inputs and players.
+
+### Part 2 -- Desktop Popup Layout bug
+
+A second screenshot showed the fix from Entry 7 wasn't holding up in
+a real browser: the timer and mute button were barely visible at the
+very bottom edge of the viewport, with the action buttons not visible
+at all. Static analysis of the CSS and HTML structure didn't reveal
+an obvious defect -- the nested `flex` + `min-height:0` +
+`flex:1 1 auto`/`flex:0 0 auto` pattern from Entry 7 is valid CSS, but
+it's also a well-documented category of cross-browser flexbox
+inconsistency, and this sandbox has no real rendering engine to
+confirm which specific behavior was occurring.
+
+**Rather than keep guessing at the exact mechanism, switched to a
+simpler, more broadly-compatible pattern:** the popup box itself is
+now the single scrolling container (`overflow-y:auto` directly on it)
+instead of a nested scroll region inside a flex column. The timer
+became a genuine sticky header (`position:sticky; top:0`) -- moved in
+the HTML, not just CSS, since it was previously sitting inside the
+scrollable content near the bottom and didn't actually satisfy "timer
+always visible" even before this specific bug. The buttons became a
+sticky footer (`position:sticky; bottom:0`), each with an explicit
+white background so scrolled content can't show through underneath.
+Applied identically to the History and End Game windows, which were
+built with the same flex pattern and very likely had the same latent
+issue even though only the popup was reported.
+
+**A related risk found while checking every modal for the same
+issue:** `TargetSelector` (used for Bomb/Freeze/Steal/Gift targeting)
+had no height constraint at all -- it lists one button per eligible
+player, so a 20-player game (which Part 1's fix just made properly
+reachable for the first time) could produce up to 19 stacked buttons
+with nowhere to go. Added the same `max-height:90vh; overflow-y:auto;`
+safety net there, plus `ContractOffer` and the Sudden Death box for
+consistency, even though their content is normally short.
+
+**Files changed:** `style.css` (all six modals: popup, History window,
+End Game window, TargetSelector, ContractOffer, Sudden Death),
+`index.html` (moved `#timerArea` out of `#popupScrollArea` to be a
+proper sibling/header rather than trailing content).
+
+**Verification and an honest limitation:** confirmed via a real
+DOM-tree check against the actual `index.html` (not a reimplementation)
+that the header/scroll-area/footer are correctly ordered as direct
+sibling children of the single scrolling container, for all three
+major modals. CSS brace balance and full JS syntax sweep both clean.
+This sandbox still can't render actual layout, so — same limitation
+noted honestly in Entry 7 — this is verified structurally and by CSS
+reasoning, not by literally watching it render. Flagged for the user
+to confirm visually before considering Part 2 fully closed.
+
+### Known issues
+
+- None found beyond needing visual confirmation of Part 2, noted above.
+
+### Deferred work / technical debt
+
+- Parts 3 (Contracts Panel UX), 4 (Contract Architecture Audit),
+  5 (Full Architecture Audit), and 6 (Regression Testing) are not
+  started.
