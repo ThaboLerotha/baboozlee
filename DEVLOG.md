@@ -1317,3 +1317,76 @@ to confirm visually before considering Part 2 fully closed.
 - Parts 3 (Contracts Panel UX), 4 (Contract Architecture Audit),
   5 (Full Architecture Audit), and 6 (Regression Testing) are not
   started.
+
+---
+
+## Entry 14 — Contract System UX Polish
+
+UX only, per instruction. No engine, trigger, or event logic changed
+-- confirmed by test (accept/decline mechanics behave identically to
+before).
+
+### Files changed
+
+- `gnite/js/ui/contractOffer.js`
+- `gnite/js/managers/contractManager.js` (`renderPanel()` only)
+- `gnite/style.css`
+
+### Part 1 -- Contract Offer popup
+
+Added a reward line (`🏆 Reward: +N Points`), read directly from the
+same `def` object every other part of `ContractOffer` already reads
+from (`def.name`, `def.description`) -- `open(def, ...)` already
+received the full database entry, so there was no new data plumbing
+needed, just rendering a field that was already available. Hidden
+gracefully if a contract has no point reward, rather than showing a
+blank or "+undefined" line.
+
+### Part 2 -- Contracts panel
+
+Replaced the single-line `"Name -- status (progress/target)"` format
+with a proper hierarchy: name (bold), description (smaller, muted),
+reward, and a status line. Active contracts show
+`Progress: X/Y • Active`; completed contracts show `Completed ✓`
+instead of a now-meaningless progress fraction; failed contracts show
+`Failed ✗`. All four fields (name, description, reward, progress) come
+from the same `this._getDefinition(instance.contractId)` lookup the
+panel already used -- no new data source introduced.
+
+### Part 3 -- Consistency (single source of truth)
+
+Both displays already pulled from `ContractDatabase` entries before
+this milestone; this pass didn't need to fix a duplication problem so
+much as confirm one never existed and add the reward field using the
+same pattern. Verified this directly rather than assuming it: a test
+mutated a contract's `reward.points` and `description` on the live
+`ContractDatabase` object mid-run and confirmed both the offer popup
+and the panel immediately reflected the change on their next render,
+with nothing to update in either UI file.
+
+### Known issues
+
+- None found. See verification below.
+
+### Deferred work / technical debt
+
+- End Game summary reading from the contract database is noted as
+  "(future)" in the original request -- not touched here, since the
+  End Game summary currently shows aggregate counts (Contracts
+  Completed: N) derived from History, not individual contract
+  name/description/reward. Revisit if a future request wants
+  per-contract detail on the End Game screen specifically.
+
+### Verification performed
+
+- Full syntax sweep, CSS brace balance, DOM-id cross-reference check.
+- A 5-part functional test against the real files: confirmed the
+  offer popup's title/description/reward match the database entry
+  exactly; confirmed the panel renders name/description/reward/
+  progress/status for an active contract; confirmed a completed
+  contract shows "Completed" instead of a stale progress fraction;
+  confirmed mutating the database mid-run automatically changes both
+  the offer popup and the panel on their next render (the core
+  single-source-of-truth requirement, verified rather than assumed);
+  confirmed Accept/Decline buttons are still created and wired
+  identically to before.

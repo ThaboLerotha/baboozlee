@@ -51,6 +51,10 @@ const ContractOffer = {
 
         const description = document.createElement("p");
 
+        const reward = document.createElement("p");
+
+        reward.classList.add("contractOfferReward");
+
         const buttons = document.createElement("div");
 
         buttons.classList.add("contractOfferButtons");
@@ -73,6 +77,8 @@ const ContractOffer = {
 
         box.appendChild(description);
 
+        box.appendChild(reward);
+
         box.appendChild(buttons);
 
         overlay.appendChild(box);
@@ -84,6 +90,8 @@ const ContractOffer = {
         this._titleEl = title;
 
         this._descriptionEl = description;
+
+        this._rewardEl = reward;
 
         this._acceptBtn = acceptBtn;
 
@@ -100,6 +108,23 @@ const ContractOffer = {
         this._titleEl.textContent = def.name;
 
         this._descriptionEl.textContent = def.description;
+
+        // Reads straight from the same definition object every other
+        // display of this contract reads from -- nothing here is a
+        // separate copy that could drift out of sync with the database.
+        if(def.reward && def.reward.points){
+
+            this._rewardEl.textContent = "🏆 Reward: +" + def.reward.points + " Points";
+
+            this._rewardEl.classList.remove("hidden");
+
+        } else {
+
+            this._rewardEl.textContent = "";
+
+            this._rewardEl.classList.add("hidden");
+
+        }
 
         // Replace the buttons with fresh clones so no listener from a
         // previous offer can ever fire twice.

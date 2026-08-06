@@ -692,9 +692,51 @@ const ContractManager = {
 
                 const def = this._getDefinition(instance.contractId);
 
-                const label = def ? def.name : "Unknown Contract";
+                if(!def){
 
-                html += `<p>${label} -- ${instance.status} (${instance.progress}/${instance.target})</p>`;
+                    html += `<div class="contractEntry"><div class="contractName">Unknown Contract</div></div>`;
+
+                    return;
+
+                }
+
+                const rewardLine = (def.reward && def.reward.points)
+
+                    ? `<div class="contractReward">Reward: +${def.reward.points}</div>`
+
+                    : "";
+
+                let statusLine;
+
+                if(instance.status === "completed"){
+
+                    statusLine = `<div class="contractStatusLine contractCompleted">Completed ✓</div>`;
+
+                } else if(instance.status === "failed"){
+
+                    statusLine = `<div class="contractStatusLine contractFailed">Failed ✗</div>`;
+
+                } else {
+
+                    statusLine = `<div class="contractStatusLine">Progress: ${instance.progress}/${instance.target} • Active</div>`;
+
+                }
+
+                html += `
+
+<div class="contractEntry">
+
+<div class="contractName">${def.name}</div>
+
+<div class="contractDescription">${def.description}</div>
+
+${rewardLine}
+
+${statusLine}
+
+</div>
+
+`;
 
             });
 

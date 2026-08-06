@@ -504,6 +504,74 @@ main{
 
 }
 
+.contractEntry{
+
+    padding:8px 0;
+
+    border-bottom:1px solid rgba(255,255,255,.08);
+
+}
+
+.contractEntry:last-child{
+
+    border-bottom:none;
+
+}
+
+.contractName{
+
+    font-size:15px;
+
+    font-weight:bold;
+
+    color:white;
+
+}
+
+.contractDescription{
+
+    font-size:12px;
+
+    color:#999;
+
+    margin-top:2px;
+
+    line-height:1.4;
+
+}
+
+.contractReward{
+
+    font-size:12px;
+
+    color:#ffcc66;
+
+    margin-top:4px;
+
+}
+
+.contractStatusLine{
+
+    font-size:12px;
+
+    color:#888;
+
+    margin-top:2px;
+
+}
+
+.contractCompleted{
+
+    color:#81C784;
+
+}
+
+.contractFailed{
+
+    color:#e57373;
+
+}
+
 .scorePlayer{
 
     display:flex;
@@ -911,6 +979,16 @@ main{
     margin-top:15px;
 
     color:#4CAF50;
+
+}
+
+.contractOfferReward{
+
+    font-weight:bold;
+
+    color:#e6a817;
+
+    margin-top:10px;
 
 }
 
