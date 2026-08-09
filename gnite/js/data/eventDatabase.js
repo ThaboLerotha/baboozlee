@@ -17,6 +17,8 @@ const EventDatabase = [
 
         key: "BOMB_SELF",
 
+        category: "Harmful",
+
         name: "Bomb (Self)",
 
         description: "You lose 200 points.",
@@ -34,6 +36,8 @@ const EventDatabase = [
         id: 2,
 
         key: "DOUBLE_POINTS",
+
+        category: "Beneficial",
 
         name: "Double Points",
 
@@ -53,6 +57,8 @@ const EventDatabase = [
 
         key: "BONUS_TURN",
 
+        category: "Beneficial",
+
         name: "Bonus Turn",
 
         description: "You get another turn immediately.",
@@ -70,6 +76,8 @@ const EventDatabase = [
         id: 4,
 
         key: "SHIELD",
+
+        category: "Beneficial",
 
         name: "Shield",
 
@@ -93,6 +101,8 @@ const EventDatabase = [
 
         key: "BOMB_OTHER",
 
+        category: "Harmful",
+
         name: "Bomb Other",
 
         description: "Choose another player. They lose 200 points.",
@@ -110,6 +120,8 @@ const EventDatabase = [
         id: 6,
 
         key: "FREEZE",
+
+        category: "Harmful",
 
         name: "Freeze",
 
@@ -129,6 +141,8 @@ const EventDatabase = [
 
         key: "GIFT",
 
+        category: "Beneficial",
+
         name: "Gift",
 
         description: "Choose another player. Give them 100 of your points.",
@@ -146,6 +160,8 @@ const EventDatabase = [
         id: 8,
 
         key: "STEAL",
+
+        category: "Harmful",
 
         name: "Steal",
 
@@ -169,6 +185,8 @@ const EventDatabase = [
 
         key: "JACKPOT",
 
+        category: "Beneficial",
+
         name: "Jackpot",
 
         description: "Removes a few of the board's lowest-value tiles.",
@@ -186,6 +204,8 @@ const EventDatabase = [
         id: 10,
 
         key: "BAD_JACKPOT",
+
+        category: "Harmful",
 
         name: "Bad Jackpot",
 
@@ -205,6 +225,8 @@ const EventDatabase = [
 
         key: "CHAOS",
 
+        category: "Neutral",
+
         name: "Chaos",
 
         description: "Randomly redistributes hidden events on the board.",
@@ -223,6 +245,8 @@ const EventDatabase = [
 
         key: "CLEANUP",
 
+        category: "Neutral",
+
         name: "Cleanup",
 
         description: "Removes one hidden event from the board.",
@@ -240,6 +264,8 @@ const EventDatabase = [
         id: 13,
 
         key: "METEOR",
+
+        category: "Harmful",
 
         name: "Meteor",
 
@@ -263,6 +289,8 @@ const EventDatabase = [
 
         key: "TIME_WARP",
 
+        category: "Harmful",
+
         name: "Time Warp",
 
         description: "Cuts the current timer in half.",
@@ -280,6 +308,8 @@ const EventDatabase = [
         id: 15,
 
         key: "NO_ESCAPE",
+
+        category: "Harmful",
 
         name: "No Escape",
 

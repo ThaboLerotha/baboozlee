@@ -281,17 +281,49 @@ const ContractManager = {
 
             }
 
-        } else if(typeof HistoryManager !== "undefined"){
+            if(typeof NotificationManager !== "undefined"){
 
-            HistoryManager.record(
+                NotificationManager.notify(
 
-                playerId,
+                    "📜 Contract Accepted",
 
-                "Contract Declined",
+                    def.name,
 
-                `${player.name} declined the contract "${def.name}".`
+                    "success"
 
-            );
+                );
+
+            }
+
+        } else {
+
+            if(typeof HistoryManager !== "undefined"){
+
+                HistoryManager.record(
+
+                    playerId,
+
+                    "Contract Declined",
+
+                    `${player.name} declined the contract "${def.name}".`
+
+                );
+
+            }
+
+            if(typeof NotificationManager !== "undefined"){
+
+                NotificationManager.notify(
+
+                    "Contract Declined",
+
+                    def.name,
+
+                    "info"
+
+                );
+
+            }
 
         }
 
@@ -489,6 +521,26 @@ const ContractManager = {
 
         }
 
+        if(typeof NotificationManager !== "undefined" && def){
+
+            const rewardText = (def.reward && def.reward.points)
+
+                ? `+${def.reward.points} Points`
+
+                : "";
+
+            NotificationManager.notify(
+
+                "✅ Contract Completed",
+
+                def.name + (rewardText ? "\n" + rewardText : ""),
+
+                "success"
+
+            );
+
+        }
+
         this.renderPanel();
 
     },
@@ -528,6 +580,26 @@ const ContractManager = {
                     "Contract Failed",
 
                     `${player.name} failed "${def.name}".`
+
+                );
+
+            }
+
+        }
+
+        if(typeof NotificationManager !== "undefined"){
+
+            const def = this._getDefinition(instance.contractId);
+
+            if(def){
+
+                NotificationManager.notify(
+
+                    "❌ Contract Failed",
+
+                    def.name,
+
+                    "failure"
 
                 );
 

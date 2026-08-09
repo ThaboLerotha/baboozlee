@@ -187,6 +187,12 @@ const Board = {
 
         div.innerHTML = "✓";
 
+        if(typeof InformationBoard !== "undefined"){
+
+            InformationBoard.render();
+
+        }
+
         // Board only reports that a tile was consumed. Whether that
         // means the game has ended, who won, or what happens next is
         // entirely GameEndManager's decision -- Board has no opinion
@@ -285,6 +291,12 @@ const Board = {
             }
 
         });
+
+        if(typeof InformationBoard !== "undefined"){
+
+            InformationBoard.render();
+
+        }
 
         // Same notify-only contract as markUsed() -- Jackpot/Meteor can
         // also be the thing that exhausts the last unused tiles.

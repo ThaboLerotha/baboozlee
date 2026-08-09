@@ -181,6 +181,26 @@ const EventExecutor = {
 
     },
 
+    // A temporary, decision-relevant notification -- distinct from
+    // the permanent History entry recordOutcome() already writes.
+    notifyShieldBroken(player, blockedEvent){
+
+        if(typeof NotificationManager !== "undefined" && player){
+
+            NotificationManager.notify(
+
+                "🛡️ Shield Broken",
+
+                `${player.name}'s shield blocked ${blockedEvent}.`,
+
+                "info"
+
+            );
+
+        }
+
+    },
+
     // =========================================
     // Self Events
     // =========================================
@@ -261,6 +281,8 @@ const EventExecutor = {
 
             this.recordOutcome(target.id, `${target.name}'s shield blocked a Bomb.`);
 
+            this.notifyShieldBroken(target, "a Bomb");
+
             Score.update();
 
             if(typeof ContractManager !== "undefined"){
@@ -305,6 +327,8 @@ const EventExecutor = {
 
             this.recordOutcome(target.id, `${target.name}'s shield blocked a Freeze.`);
 
+            this.notifyShieldBroken(target, "a Freeze");
+
             Score.update();
 
             return;
@@ -342,6 +366,8 @@ const EventExecutor = {
         if(this.consumeShieldIfPresent(target)){
 
             this.recordOutcome(target.id, `${target.name}'s shield blocked a Steal.`);
+
+            this.notifyShieldBroken(target, "a Steal");
 
             Score.update();
 
@@ -453,6 +479,16 @@ const EventExecutor = {
 
         );
 
+        // convertRandomEventTiles() -> convertTilesToStale() changes
+        // which events remain hidden, but doesn't mark tiles used, so
+        // it doesn't go through Board's markUsed()/markTilesUsed()
+        // hooks -- rendered explicitly here instead.
+        if(typeof InformationBoard !== "undefined"){
+
+            InformationBoard.render();
+
+        }
+
     },
 
     // Shuffles hidden events among the other unrevealed event/mixed
@@ -498,6 +534,12 @@ const EventExecutor = {
                 : "Cleanup found no hidden events to remove."
 
         );
+
+        if(typeof InformationBoard !== "undefined"){
+
+            InformationBoard.render();
+
+        }
 
     },
 

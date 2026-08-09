@@ -162,6 +162,20 @@ const GameEndManager = {
 
         }
 
+        if(typeof NotificationManager !== "undefined"){
+
+            NotificationManager.notify(
+
+                "⚔️ Sudden Death",
+
+                tiedPlayers.map(p => p.name).join(", ") + " are tied!",
+
+                "info"
+
+            );
+
+        }
+
         this.nextSuddenDeathQuestion();
 
     },
@@ -617,6 +631,12 @@ ${summaryRows}
         Board.build();
 
         Score.draw();
+
+        if(typeof InformationBoard !== "undefined"){
+
+            InformationBoard.render();
+
+        }
 
         if(typeof Timer !== "undefined"){
 

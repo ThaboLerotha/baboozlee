@@ -1390,3 +1390,165 @@ with nothing to update in either UI file.
   single-source-of-truth requirement, verified rather than assumed);
   confirmed Accept/Decline buttons are still created and wired
   identically to before.
+
+---
+
+## Entry 15 — Information Architecture: Notifications, Information Board, Event Categories
+
+### Files changed
+
+- `gnite/js/managers/notificationManager.js` (new)
+- `gnite/js/managers/informationBoard.js` (new)
+- `gnite/js/managers/contractManager.js`
+- `gnite/js/managers/eventExecutor.js`
+- `gnite/js/managers/gameEndManager.js`
+- `gnite/js/game/board.js`
+- `gnite/js/data/eventDatabase.js`
+- `gnite/js/engine/app.js`
+- `gnite/js/ui/ui.js`
+- `gnite/index.html`
+- `gnite/style.css`
+
+### Architectural finding, per Part 4's "explain a cleaner architecture
+before implementing"
+
+`EventManager.removeActiveEvent()` exists but is never called anywhere
+in the codebase -- confirmed via search. That means `activeEvents`
+isn't actually pruned as events resolve, so it isn't a reliable source
+for "which events are still hidden." The genuinely reliable source is
+`GameNight.board` itself: `!tile.used && tile.event.type !== "none"`
+is kept accurate by every board mutation already (Chaos, Cleanup,
+Meteor, normal resolution), since they all directly modify tile state.
+`InformationBoard` derives its Hidden Event counts from that, cross-
+referenced with `EventDatabase`'s new `category` field -- not from
+`EventManager` at all, and not from any new tracked count. This
+directly satisfies "do not duplicate data that already exists
+elsewhere."
+
+### Part 1 & 2 -- NotificationManager, wired to Contract lifecycle
+
+`NotificationManager.notify(title, description, type)` is the only
+method anything calls -- same pattern as `HistoryManager.record()`. It
+owns no knowledge of contracts, shields, or anything else; callers
+build their own text. Temporary (auto-dismiss after 4s with a fade),
+visually and architecturally distinct from `HistoryManager` (permanent)
+and the Contracts panel (persistent).
+
+Wired at every point where a real system already exists to trigger
+one: `completeContract()`, `failContract()`, and the accept/decline
+branch in `checkTrigger()` (all in `contractManager.js`); a new
+`notifyShieldBroken()` helper called from all three shield-blocked
+branches in `eventExecutor.js` (Bomb Other, Freeze, Steal); and Sudden
+Death starting, in `gameEndManager.js`.
+
+**Not wired, because no real system exists yet to trigger them:**
+"Player left the game," "Legacy Chest created," "Reward Chest opened,"
+and "Threat Level changed" were all listed as examples in the request,
+but each depends on a system explicitly deferred to Part 5's backlog.
+`NotificationManager.notify()` is fully generic and ready for them the
+moment those systems exist -- same pattern as History's Contract
+Accepted/Declined gap before the trigger engine existed (Entry 11 ->
+closed in Entry 12).
+
+### Part 3 -- Information Board
+
+New `#infoBoard` panel, a fourth column in the existing `<main>` flex
+layout alongside `#board`/`#scoreboardColumn`/`#contractPanel` --
+matching an already-established pattern rather than inventing a new
+layout mechanism, which is what "determine the cleanest location"
+concluded.
+
+**Treasure Status tension, resolved and flagged rather than decided
+silently:** Part 3 asks for Treasure Status content now; Part 5
+explicitly says not to implement Treasure Chests yet. Resolved by
+defining the display contract a future chest system would write into
+(`GameNight.rewardChestStatus` / `GameNight.legacyChestStatus`) without
+implementing any chest logic. Since neither is set anywhere yet, the
+board honestly shows "Not yet available" / "Not Created" rather than
+fabricating chest state that doesn't exist. This is exactly what
+"prepare architecture, don't implement" means applied to a specific
+field, not just a vague principle.
+
+**Update triggers:** rendered once at game start (both the normal
+Start Game flow and the New-Game-replay flow) and re-rendered inside
+`Board.markUsed()`/`markTilesUsed()`, matching the moments board state
+actually changes. One gap caught by testing, not assumed away:
+`Cleanup`/`Bad Jackpot` convert event tiles to Stale via
+`convertTilesToStale()`, which does NOT mark the tile used -- it stays
+playable, just empty -- so it never goes through `markUsed()`. Added
+an explicit `InformationBoard.render()` call directly in `badJackpot()`
+and `cleanup()` to cover this. `Chaos` was deliberately left
+unwired -- it shuffles which tile holds which event without changing
+any category's total count, so a re-render there would be a no-op.
+
+### Part 4 -- Event Database categories
+
+Added a `category` field (`"Beneficial"` | `"Harmful"` | `"Neutral"`)
+to all 15 events. Distribution: 8 Harmful, 5 Beneficial, 2 Neutral.
+Reasoning for each, briefly: Self/Board events that damage or destroy
+(Bomb Self, Bomb Other, Freeze, Steal, Bad Jackpot, Meteor, Time Warp,
+No Escape) are Harmful; things that clearly help the player who
+triggers or receives them (Double Points, Bonus Turn, Shield, Gift,
+Jackpot) are Beneficial; Chaos and Cleanup are Neutral since their
+effect is genuinely unpredictable/situational rather than reliably
+good or bad. These are content judgment calls, not architecture --
+flagged as adjustable if the categorization doesn't match design
+intent.
+
+### Part 5 -- Backlog preparation (no implementation, as instructed)
+
+**Threat Engine:** `NotificationManager.notify(..., "info")` is ready
+to receive a "Threat Level changed" call the moment Threat Levels
+exist -- no changes needed to accept it. A future Threat Level field
+would most naturally live on `GameNight` itself (e.g.
+`GameNight.threatLevel`), the same place `rewardChestStatus`/
+`legacyChestStatus` were just defined to live, keeping one place for
+"current game state fields nothing else fully owns." The Information
+Board already has an established pattern (one section per state
+category, re-rendered from a single `render()` call) that a "Threat
+Level" section could slot into directly.
+
+**Player Departure / Treasure Chests:** `GameNight.rewardChestStatus`
+/ `GameNight.legacyChestStatus` are the two fields a future system
+would set; `InformationBoard.render()` already reads them and will
+start showing real values the moment something writes to them, with
+zero changes to `informationBoard.js` itself. `HistoryManager.record()`
+is generic enough to log a departure directly. No code was written for
+turn-rotation removal, chest creation/merging, or event-protection --
+those remain real design/engineering work for that milestone, not
+something today's architecture could paper over.
+
+### Known issues
+
+- None found. See verification below.
+
+### Deferred work / technical debt
+
+- Event category assignments (Part 4) are a first-pass content
+  judgment call, not verified against any specific design intent
+  beyond "does this event help or hurt."
+- Treasure Chest and Threat Level systems remain fully unimplemented,
+  as instructed.
+
+### Verification performed
+
+- Full syntax sweep across every JS file, CSS brace balance, HTML
+  div-tag balance, DOM-id cross-reference check.
+- Confirmed via search that no hardcoded event-category list exists
+  anywhere outside `eventDatabase.js` itself.
+- A 5-part functional test: `NotificationManager.notify()` creates a
+  correctly-styled card; all 15 events have a valid category with no
+  gaps; `InformationBoard.render()` derives exactly correct counts
+  from a synthetic board (including correctly excluding a used tile
+  and a tile with no real event); counts update correctly when a tile
+  is marked used; counts update correctly when a tile is converted to
+  Stale (the Cleanup/Bad Jackpot case).
+- A second, focused test against the real `contractManager.js` and
+  `eventExecutor.js`: confirmed `completeContract()`/`failContract()`
+  each fire exactly one notification with the correct title; confirmed
+  a shield blocking a real `bombOther()` call fires a Shield Broken
+  notification and correctly consumes the shield (a first attempt at
+  this test had a timing bug -- calling the async handler without
+  `await` let the assertion run before the promise's continuation --
+  caught and fixed before treating the result as valid, not reported
+  as a false failure).

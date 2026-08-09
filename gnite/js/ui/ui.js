@@ -122,6 +122,12 @@ const UI = {
 
                 Score.draw();
 
+                if(typeof InformationBoard !== "undefined"){
+
+                    InformationBoard.render();
+
+                }
+
                 if (typeof Timer !== "undefined") {
 
                     Timer.initialize();

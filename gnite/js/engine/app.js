@@ -45,6 +45,12 @@ if(typeof HistoryManager !== "undefined"){
 
 }
 
+if(typeof NotificationManager !== "undefined"){
+
+    NotificationManager.initialize();
+
+}
+
 if(typeof GameEndManager !== "undefined"){
 
     GameEndManager.initialize();
