@@ -502,6 +502,67 @@ integrations) is actually built.
 
 ---
 
+## VERIFIED — Threat Engine, Step 2: threatManager.js (decision logic, no execution)
+
+**Verified against commit:** `cc61d44`
+
+**Systems/files involved:** `js/managers/threatManager.js` (new —
+level tracking, harmful-event counting, cooldown, punishment roll and
+weighted selection), `index.html` (one script tag, no other changes).
+Reads `GameNight.board` and `GameNight.players` (existing globals);
+does not modify either. Not called from `eventExecutor.js`, `popup.js`,
+`contractManager.js`, `engine/app.js`, or anywhere else — this step is
+intentionally not integrated into the game loop.
+
+**What was tested (19-part Node test against the real files, run
+through `vm`, not reimplementations):**
+- Level transitions: NORMAL→DANGEROUS at exactly 50% board progress;
+  NORMAL→DANGEROUS at exactly 3 harmful events with 0% board progress
+  (and confirmed still NORMAL at 2); NORMAL→CRITICAL directly at 80%
+  board progress in one evaluation (both thresholds crossed at once);
+  DANGEROUS→CRITICAL at exactly 6 harmful events (confirmed still
+  DANGEROUS at 5).
+- Harmful-event counting: confirmed it's a single global running
+  total across multiple different players, not per-player.
+- No downgrade: forced the level to CRITICAL, then reset board
+  progress and harmful count back to zero-equivalent conditions and
+  re-ran `evaluateLevel()` — level stayed CRITICAL.
+- Cooldown: a forced punishment hit sets the cooldown to
+  `ThreatCooldownLength` (2); a subsequent harmful event against that
+  player is blocked from rolling and decrements the cooldown instead;
+  after 2 qualifying harmful events the cooldown reaches 0; the next
+  harmful event rolls normally again. Also confirmed cooldown is
+  strictly per-player — punishing player 1 left player 2's cooldown at
+  0.
+- Punishment selection: level gating (CRITICAL-only punishments never
+  selected at DANGEROUS, over 200 trials); `requiresShield` correctly
+  blocks SHIELD_BREAK for a player with no Shield (300 trials, zero
+  hits) and allows it for a player who has one; a 20,000-trial
+  distribution check confirmed the weighted selection matches
+  `threatDatabase.js`'s weights (30/25/25/12/8) within 3 percentage
+  points per punishment.
+- Player-count independence: `getBoardProgress()` is a plain
+  used/total ratio; confirmed via source-text check that
+  `threatManager.js` contains no `players.length` reference anywhere.
+- NORMAL level: confirmed `rollPunishment()` never fires even on a
+  forced `Math.random() = 0.0`, since `punishmentChance` is 0.
+
+**Explicitly NOT tested (because nothing exists yet to test it
+against):** actual punishment execution/application to a player
+(ThreatConsequences doesn't exist yet), any interaction with
+`eventExecutor.js`/`popup.js`/`contractManager.js` (unmodified, not
+called), calling this manager from the real game loop (`app.js`
+doesn't call `ThreatManager.initialize()` yet).
+
+**Would require rerun if:** any `ThreatLevels`/`ThreatPunishments`/
+`ThreatCooldownLength` value in `threatDatabase.js` changes,
+`evaluateLevel()`'s upgrade-only logic changes, `registerHarmfulEvent()`
+or `rollPunishment()`'s sequencing changes, `selectPunishment()`'s
+eligibility filtering or weighting changes, or `getBoardProgress()`'s
+source of tile data changes.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

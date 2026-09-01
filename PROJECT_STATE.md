@@ -1,7 +1,7 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `816dde6` — "Threat Engine: data layer
-(`threatDatabase.js`) — step 1 of N"
+**Last updated against commit:** `cc61d44` — "Threat Engine: ThreatManager
+(`threatManager.js`) — step 2 of N"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -52,16 +52,37 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
     `ThreatCooldownLength = 2`). No logic, no game-state reads. Wired
     into `index.html` load order directly after `contractDatabase.js`
     (data files load together, before any manager).
-  - NOT STARTED: `ThreatManager` (level tracking, board-progress/
-    harmful-event counting, punishment roll+selection, cooldown
-    tracking), `ThreatConsequences` (executing a selected punishment's
-    effect), integration into `eventExecutor.js` (harmful-event
-    counting hook), `popup.js` (Pass skips the punishment roll),
-    `contractManager.js` (`blockOptionalContracts()` /
-    `wipeOptionalContracts()` + a wiped-contract terminal state),
-    `informationBoard.js` (show current Threat Level + hidden-event
-    count, no location hints), `notificationManager.js` calls for
-    level-change/punishment events.
+  - DONE: `js/managers/threatManager.js` — decides, doesn't act.
+    Global `currentLevelIndex` (never decreases) and
+    `harmfulEventsResolved` counter; per-player `playerCooldowns`
+    map. Public API: `getCurrentLevel()`/`getCurrentLevelKey()`,
+    `getHarmfulEventsResolved()`, `getCooldown(playerId)`/
+    `isOnCooldown(playerId)`, `getBoardProgress()` (used-tiles /
+    `GameNight.board.length`, player-count independent),
+    `getSummary()` (level/harmfulEventsResolved/boardProgress
+    snapshot, deliberately excludes cooldowns and anything
+    location-revealing), `evaluateLevel()` (upgrade-only check
+    against the next level's trigger), `registerHarmfulEvent(playerId)`
+    (the intended future single entry point: increments the counter,
+    evaluates level, then either decrements cooldown or calls
+    `rollPunishment`), `rollPunishment(playerId)` (chance roll against
+    the current level, then delegates to `selectPunishment` and sets
+    cooldown on a hit), `selectPunishment(playerId, levelKey)`
+    (weighted random among level- and Shield-eligible punishments).
+    Selection only — never mutates a player's score/shield/contracts,
+    never calls any other manager. Wired into `index.html` (script tag
+    only, directly after `gameEndManager.js`); `GameNight.initialize()`
+    does NOT call `ThreatManager.initialize()` yet — that's part of
+    real game-loop integration, a later step.
+  - NOT STARTED: `ThreatConsequences` (executing a selected
+    punishment's effect), integration into `eventExecutor.js`
+    (calling `registerHarmfulEvent()` when a harmful event resolves),
+    `popup.js` (Pass skips the roll), `contractManager.js`
+    (`blockOptionalContracts()` / `wipeOptionalContracts()` + a wiped
+    terminal state), `informationBoard.js` (show current Threat Level
+    + hidden-event count, no location hints), `notificationManager.js`
+    calls for level-change/punishment events, and calling
+    `ThreatManager.initialize()`/`.reset()` from the real game loop.
 
 ## Systems: prepared but intentionally NOT implemented (architecture only)
 
@@ -105,6 +126,7 @@ See BACKLOG.md for the full list of approved-but-not-started features.
 
 ## Currently being developed
 
-Threat Engine — data layer complete, manager not started. Next step:
-`ThreatManager` (level tracking + trigger evaluation), the first piece
-that actually reads game state.
+Threat Engine — data layer and `ThreatManager` (decision logic) both
+complete; nothing executes a punishment yet and nothing calls this
+manager from real gameplay. Next step: `ThreatConsequences` — actually
+applying a selected punishment's effect to a player.

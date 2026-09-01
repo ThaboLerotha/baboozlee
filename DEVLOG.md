@@ -1617,3 +1617,96 @@ this entry covers only the first, dependency-free piece.
 first piece that actually reads `Board`/`GameNight` and needs a
 harmful-event-resolved counter), plus the punishment roll and weighted
 selection against `ThreatPunishments`.
+
+## Entry 17 — Threat Engine: Step 2 (ThreatManager)
+
+### What changed
+
+- New: `js/managers/threatManager.js` — decision logic only, never
+  executes an effect on a player:
+  - Global `currentLevelIndex` (index into `ThreatLevels`, never
+    decreases) and `harmfulEventsResolved` counter; per-player
+    `playerCooldowns` map (cooldown targets a specific player, level
+    doesn't).
+  - `evaluateLevel()` checks only the next level up against its
+    trigger (board progress OR harmful-event count), upgrades if
+    either is met, and recurses once in case both DANGEROUS and
+    CRITICAL thresholds were crossed in a single jump. No code path
+    lowers the level.
+  - `getBoardProgress()` reads `GameNight.board` directly (same
+    tiles-used/total pattern `GameEndManager.checkBoardExhausted()`
+    already uses) — a plain ratio, so it's automatically correct at
+    any player count without referencing player count at all.
+  - `registerHarmfulEvent(playerId)` — the intended single future
+    entry point (nothing calls it yet): increments the global counter,
+    evaluates the level, then either decrements that player's cooldown
+    (and returns without rolling) or calls `rollPunishment`.
+  - `rollPunishment(playerId)` — one roll against the current level's
+    `punishmentChance`; on a hit, delegates to `selectPunishment` and,
+    if a punishment was actually selected, sets that player's cooldown
+    to `ThreatCooldownLength`.
+  - `selectPunishment(playerId, levelKey)` — filters
+    `ThreatPunishments` to those whose `minLevel` the current level
+    satisfies and whose `requiresShield` (if any) the target player
+    actually meets (reads `player.shield`, doesn't touch it), then
+    does a weighted-random pick.
+  - `getSummary()` — a small public snapshot (level, harmful count,
+    board progress) for later use by something like Information Board.
+    Deliberately leaves out per-player cooldowns and anything that
+    could hint at hidden event locations, per the design constraint on
+    what the board is allowed to reveal.
+- `index.html`: one script tag, directly after `gameEndManager.js`.
+  `engine/app.js` was NOT touched — `GameNight.initialize()` does not
+  call `ThreatManager.initialize()` yet. That's real game-loop
+  integration, not this step.
+
+### Not done in this entry (explicitly, per instruction)
+
+- `ThreatConsequences` (actually applying a selected punishment) — not
+  started.
+- No changes to `eventExecutor.js`, `popup.js`, `contractManager.js`,
+  or `engine/app.js`.
+- No punishment is ever actually applied to a player's score, Shield,
+  or contracts — `selectPunishment()` only returns which punishment
+  would apply.
+- Malicious Contracts, Treasure Chests, Player Departure — untouched.
+
+### Verification performed
+
+19-part Node test (via `vm`, loading the real `threatDatabase.js` and
+`threatManager.js`, not reimplementations), covering:
+- Level transitions NORMAL→DANGEROUS→CRITICAL by both board-progress
+  and harmful-event-count triggers, including a direct NORMAL→CRITICAL
+  jump when both thresholds are crossed in one evaluation.
+- Harmful-event counting is global across players, not per-player.
+- Level never downgrades, even when forced back below both thresholds.
+- Cooldown: fires on a punishment hit, blocks rolling while active,
+  decrements per qualifying harmful event, rolls resume at 0; confirmed
+  strictly per-player (punishing one player left another's cooldown at
+  0).
+- Punishment selection: level gating (200 trials, zero CRITICAL-only
+  punishments selected at DANGEROUS), Shield-requirement gating (300
+  trials with no Shield → zero SHIELD_BREAK selections; confirmed
+  selectable with a Shield), and a 20,000-trial distribution check
+  confirming the weighted selection matches the database's
+  30/25/25/12/8 weights within 3 percentage points each.
+- Confirmed `getBoardProgress()` has no player-count assumption
+  (source-text check for `players.length` — none found).
+- Confirmed NORMAL level (0% punishment chance) never fires a
+  punishment even on a forced worst-case roll.
+- `index.html` div-tag balance unchanged (27/27) after the script-tag
+  insertion.
+
+Not tested, because nothing exists yet to test it against: actual
+punishment execution, any interaction with the three
+still-unmodified gameplay files, or calling this manager from the real
+game loop.
+
+### Next unfinished step
+
+`ThreatConsequences` — actually applying a selected punishment's
+effect (Shield removal, Contract block/wipe via `ContractManager`'s
+public methods, point drain/zeroing) to the target player. Still no
+integration into `eventExecutor.js`/`popup.js`/`contractManager.js`'s
+call sites, and still no `ThreatManager.initialize()` call from
+`engine/app.js` — those remain a separate, later step.
