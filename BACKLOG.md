@@ -3,6 +3,21 @@
 Approved-for-later only. **Do not implement anything here unless Thabo
 explicitly says to build it now.**
 
+Threat Engine is no longer here — it moved to "in progress" in
+PROJECT_STATE.md since Thabo explicitly greenlit building it.
+
+## Malicious Contracts
+
+- Future feature. Contracts whose purpose can be to harm/attack
+  another player — the contract holder can gain nothing while another
+  player receives the reward or suffers the effect.
+- Explicitly NOT implemented yet.
+- The Threat Engine is being built to accommodate this later without a
+  redesign: `ThreatManager` never reaches into `ContractManager`
+  internals directly, only through
+  `ContractManager.blockOptionalContracts(playerId)` and
+  `ContractManager.wipeOptionalContracts(playerId)`.
+
 ## Treasure Chests (Player Departure related)
 
 - Reward Chest / Legacy Chest system for players who leave a game

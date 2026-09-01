@@ -1552,3 +1552,68 @@ something today's architecture could paper over.
   `await` let the assertion run before the promise's continuation --
   caught and fixed before treating the result as valid, not reported
   as a false failure).
+
+## Entry 16 — Threat Engine: Step 1 (data layer)
+
+### What changed
+
+Started the Threat Engine, approved design (levels, punishments,
+weights, cooldown, Shield/Contract interaction rules — full spec now
+also recorded in BACKLOG.md and PROJECT_STATE.md). Building it
+incrementally, one dependency at a time, per explicit instruction —
+this entry covers only the first, dependency-free piece.
+
+- New: `js/data/threatDatabase.js` — pure data, no logic, reads no
+  game state:
+  - `ThreatLevels`: NORMAL (0% punishment chance), DANGEROUS (37%,
+    triggered at 50% board progress OR 3 harmful events resolved,
+    whichever first), CRITICAL (70%, triggered at 80% board progress
+    OR 6 harmful events resolved, whichever first). A level is never
+    downgraded once reached.
+  - `ThreatPunishments`: SHIELD_BREAK (Dangerous+, weight 30, bypasses
+    Shield since its purpose is to destroy it, requires the target to
+    actually have a Shield), CONTRACT_LOCK (Dangerous+, weight 25,
+    bypasses Shield), POINT_DRAIN (Dangerous+, weight 25,
+    Shield-protectable), LOSE_ALL_POINTS (Critical only, weight 12,
+    Shield-protectable), CONTRACT_WIPE (Critical only, weight 8,
+    bypasses Shield). Weights sum to 100.
+  - `ThreatCooldownLength = 2`.
+- `index.html`: one script tag added, directly after
+  `contractDatabase.js` (data files load together, before any
+  manager that will depend on them).
+
+### Not done in this entry (explicitly, per instruction)
+
+- `ThreatManager` (level tracking, trigger evaluation, punishment roll
+  + weighted selection, cooldown tracking) — not started.
+- `ThreatConsequences` (executing a selected punishment) — not
+  started.
+- No changes to `eventExecutor.js`, `popup.js`, or `contractManager.js`
+  — the "already modified" state referenced when this milestone was
+  requested did not actually exist in the repository; this entry is
+  the real starting point.
+- No `informationBoard.js`/`notificationManager.js` integration.
+- Malicious Contracts, Treasure Chests, Player Departure — untouched,
+  as instructed.
+
+### Verification performed
+
+- `node --check` syntax validation on the new file.
+- Structural/value assertions against the approved spec: level count,
+  order, and punishment-chance values; both triggers' board-progress
+  and harmful-event thresholds; punishment count, unique keys, weight
+  values and their sum (100), `minLevel` per punishment, and
+  `bypassesShield`/`requiresShield` flags per punishment; cooldown
+  length. All passed.
+- `index.html` div-tag balance check after the one-line insertion
+  (27/27, unchanged).
+- No functional or integration testing performed — nothing in the
+  codebase reads this file yet, so there is nothing to integration-test
+  against.
+
+### Next unfinished step
+
+`ThreatManager` — level tracking against real board/event state (the
+first piece that actually reads `Board`/`GameNight` and needs a
+harmful-event-resolved counter), plus the punishment roll and weighted
+selection against `ThreatPunishments`.

@@ -465,6 +465,43 @@ comes from a single `ContractDatabase` source of truth.
 
 ---
 
+## VERIFIED — Threat Engine, Step 1: threatDatabase.js (data layer only)
+
+**Verified against commit:** `816dde6`
+
+**Systems/files involved:** `js/data/threatDatabase.js` (new, data
+only — no logic, reads no game state), `index.html` (one script tag
+added, directly after `contractDatabase.js`).
+
+**What was tested:**
+- `node --check` syntax validation.
+- Structural/value checks against the approved spec: exactly 3
+  `ThreatLevels` in order (NORMAL/DANGEROUS/CRITICAL) with punishment
+  chances 0/0.37/0.70; DANGEROUS trigger is 50% board progress OR 3
+  harmful events; CRITICAL trigger is 80% OR 6 harmful events; exactly
+  5 `ThreatPunishments` with unique keys, weights summing to 100
+  (30/25/25/12/8), correct `minLevel` per punishment (3x Dangerous+, 2x
+  Critical-only), correct `bypassesShield`/`requiresShield` flags per
+  punishment (SHIELD_BREAK bypasses Shield and requires the target to
+  actually have one; CONTRACT_LOCK and CONTRACT_WIPE bypass Shield;
+  POINT_DRAIN and LOSE_ALL_POINTS are Shield-protectable);
+  `ThreatCooldownLength === 2`.
+- `index.html` div-tag balance check after the one-line insertion
+  (unchanged, 27/27).
+- No functional/integration testing — nothing yet reads this file.
+
+**Would require rerun if:** any value in `ThreatLevels` or
+`ThreatPunishments` changes, or a punishment/level is added or removed.
+
+**Not yet tested (because nothing exists to test it against yet):**
+level-transition logic, punishment roll/selection, cooldown behavior,
+Shield interaction, Contract integration, board-progress/harmful-event
+counting. These become testable as each dependent piece
+(`ThreatManager`, `ThreatConsequences`, the three modified-file
+integrations) is actually built.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

@@ -1,7 +1,7 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `171859a` (2026-08-09) — "Information
-Architecture: Notifications, Information Board, Event Categories"
+**Last updated against commit:** `816dde6` — "Threat Engine: data layer
+(`threatDatabase.js`) — step 1 of N"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -40,6 +40,29 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
   explicit calls added inside `badJackpot()`/`cleanup()` to cover the
   Stale-tile-conversion gap (see DEVLOG for why).
 
+## Systems: in progress
+
+- **Threat Engine** — approved design (see BACKLOG.md for the full
+  spec: threat levels, punishments, weights, cooldown, contract
+  integration contract). Building incrementally, one dependency at a
+  time.
+  - DONE: `js/data/threatDatabase.js` — data only (3 `ThreatLevels`
+    with order/punishmentChance/trigger; 5 `ThreatPunishments` with
+    minLevel/weight/bypassesShield/requiresShield;
+    `ThreatCooldownLength = 2`). No logic, no game-state reads. Wired
+    into `index.html` load order directly after `contractDatabase.js`
+    (data files load together, before any manager).
+  - NOT STARTED: `ThreatManager` (level tracking, board-progress/
+    harmful-event counting, punishment roll+selection, cooldown
+    tracking), `ThreatConsequences` (executing a selected punishment's
+    effect), integration into `eventExecutor.js` (harmful-event
+    counting hook), `popup.js` (Pass skips the punishment roll),
+    `contractManager.js` (`blockOptionalContracts()` /
+    `wipeOptionalContracts()` + a wiped-contract terminal state),
+    `informationBoard.js` (show current Threat Level + hidden-event
+    count, no location hints), `notificationManager.js` calls for
+    level-change/punishment events.
+
 ## Systems: prepared but intentionally NOT implemented (architecture only)
 
 - **Treasure Chests** — `GameNight.rewardChestStatus` /
@@ -47,12 +70,18 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
   system would write into. `InformationBoard.render()` already reads
   them and shows "Not yet available" / "Not Created" since nothing
   sets them yet. No chest creation/merge/turn-rotation logic exists.
-- **Threat Levels** — no field exists yet, but `NotificationManager` is
-  ready to receive a "Threat Level changed" call, and the natural home
-  for the data is `GameNight.threatLevel` (same pattern as the chest
-  fields above).
+  Approved design: exactly two possible chests per game (default
+  hidden chest from game start; a Legacy/Departure chest that only
+  exists if a player leaves). Never a collection of multiple chests.
 - **Player Departure** — `HistoryManager.record()` is generic enough to
   log a departure directly; no departure/removal logic is written.
+- **Malicious Contracts** — approved as future work. Contracts whose
+  purpose can be to harm another player, even if the holder gains
+  nothing. Not implemented. The Threat Engine's `ContractManager`
+  integration is being built through the public methods
+  `blockOptionalContracts()`/`wipeOptionalContracts()` specifically so
+  Malicious Contracts can be added later without redesigning the
+  Threat Engine.
 
 See BACKLOG.md for the full list of approved-but-not-started features.
 
@@ -76,6 +105,6 @@ See BACKLOG.md for the full list of approved-but-not-started features.
 
 ## Currently being developed
 
-Nothing in-flight as of this commit — last commit closed out the
-Information Architecture milestone. Next work should start from
-BACKLOG.md or explicit instruction.
+Threat Engine — data layer complete, manager not started. Next step:
+`ThreatManager` (level tracking + trigger evaluation), the first piece
+that actually reads game state.
