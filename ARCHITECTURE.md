@@ -48,7 +48,7 @@ exists.
 | `Players` | `game/players.js` | Player list creation, current-player lookup. |
 | `Score` | `managers/score.js` | Points — add/subtract, scoreboard render, turn advance. |
 | `Timer` | `managers/timer.js` | Per-turn countdown, beep, timeout handling. |
-| `ContractManager` | `managers/contractManager.js` | Contract lifecycle: assign, offer, progress, complete/fail. Dispatches to `ContractTypes` hooks. |
+| `ContractManager` | `managers/contractManager.js` | Contract lifecycle: assign, offer, progress, complete/fail. Dispatches to `ContractTypes` hooks. Also owns the per-player Optional-Contract lock/wipe punishment surface (`isOptionalContractsBlocked`/`blockOptionalContracts`/`wipeOptionalContracts`), used by `ThreatConsequences` — not yet called by anything in real gameplay. |
 | `ContractTypes` | `managers/contractTypes.js` | Per-contract-type `onHook` behavior, registered into `ContractManager`. |
 | `ContractOffer` (UI) | `ui/contractOffer.js` | The contract-offer popup panel. |
 | `HistoryManager` | `managers/historyManager.js` | Turn-by-turn game history log — generic `record()`/`render()`. |

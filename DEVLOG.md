@@ -1710,3 +1710,111 @@ public methods, point drain/zeroing) to the target player. Still no
 integration into `eventExecutor.js`/`popup.js`/`contractManager.js`'s
 call sites, and still no `ThreatManager.initialize()` call from
 `engine/app.js` — those remain a separate, later step.
+
+## Entry 18 — Threat Engine: Step 3 (ThreatConsequences)
+
+### What changed
+
+- New: `js/managers/threatConsequences.js` — applies a punishment
+  already selected by `ThreatManager`; makes no decisions of its own
+  and never reads `ThreatManager` state:
+  - `apply(playerId, punishmentKey)` — the single public entry point.
+    Validates the player exists and the punishment key is a real
+    `ThreatPunishments` entry (fails safely with a reason string for
+    either, never throws), independently re-checks `requiresShield`
+    against the player's actual `shield` value, then dispatches to a
+    handler.
+  - `SHIELD_BREAK` — sets `player.shield = false` directly. Bypasses
+    Shield by design (that's its entire purpose), so it never goes
+    through the shared Shield-block check.
+  - `CONTRACT_LOCK` — calls `ContractManager.blockOptionalContracts()`.
+    Bypasses Shield.
+  - `CONTRACT_WIPE` — calls `ContractManager.wipeOptionalContracts()`.
+    Bypasses Shield. Succeeds as a no-op (not a failure) when the
+    player has no Optional contracts.
+  - `POINT_DRAIN` — `floor(score * 0.5)`, subtracted. No clamp at zero,
+    intentionally: nothing else in the codebase's scoring paths
+    (`Score.subtractPoints`, `bombSelf`/`bombOther`, `steal`) clamps
+    either, so this stays consistent with existing precedent rather
+    than inventing a new rule.
+  - `LOSE_ALL_POINTS` — `score = 0`, reports the previous value.
+  - `POINT_DRAIN`/`LOSE_ALL_POINTS` both go through a shared
+    `_shieldBlocks()` helper first, since both have
+    `bypassesShield: false` in the database. It reuses
+    `EventExecutor.consumeShieldIfPresent()` — a genuinely public
+    method by this codebase's own convention (no underscore prefix,
+    unlike `_assign`/`_findInstance`/`_dispatch` elsewhere) — instead
+    of duplicating the three-line Shield-consumption logic that
+    already exists exactly once.
+- `js/managers/contractManager.js` (additive only, existing logic
+  unchanged): new `contractsLocked` map (playerId → true), reset
+  alongside `firedTriggers` in both `initialize()` and `startGame()`;
+  three new public methods —
+  `isOptionalContractsBlocked(playerId)`,
+  `blockOptionalContracts(playerId)` (existing active contracts stay
+  completely untouched; only future offers are gated),
+  `wipeOptionalContracts(playerId)` (filters by
+  `_getDefinition(instance.contractId).category === "optional"`, so
+  Starting contracts are matched by their actual definition, not
+  assignment order; marks matches with a new terminal status
+  `"wiped"`, distinct from `"completed"`/`"failed"`, so
+  `completeContract()`/`updateProgress()`/`_dispatch()` — all gated on
+  `status === "active"` — can never act on a wiped instance again,
+  and no reward can be accidentally paid). `offerOptionalContract()`
+  and `checkTrigger()` each got one added guard line so a locked
+  player's future Optional Contract offers/triggers are actually
+  blocked, not just flagged.
+- `index.html`: one script tag, directly after `threatManager.js`.
+
+### Not done in this entry (explicitly, per instruction)
+
+- No changes to `eventExecutor.js`, `popup.js`, or `engine/app.js`.
+- No changes to `threatManager.js` — none were necessary; its existing
+  public API already exposed everything `ThreatConsequences` needed to
+  read (it reads none of it — the two files are fully decision/
+  execution-split).
+- No harmful-event hook, no Pass interaction, no Information Board or
+  Notification changes for Threat state.
+- Nothing in normal gameplay calls `ThreatManager` or
+  `ThreatConsequences` yet.
+
+### Verification performed
+
+31-part Node test (via `vm`, loading the real `threatDatabase.js`,
+`contractDatabase.js`, `eventExecutor.js`, `contractManager.js`,
+`threatManager.js`, and `threatConsequences.js` together — not
+reimplementations), covering: invalid-player and unknown-punishment
+failure paths; all five punishments' intended effects; independent
+`requiresShield` validation for SHIELD_BREAK; Shield fully blocking
+and consuming itself against POINT_DRAIN/LOSE_ALL_POINTS specifically
+(confirmed via a spy that this goes through the real
+`EventExecutor.consumeShieldIfPresent`, not a reimplementation);
+CONTRACT_LOCK/CONTRACT_WIPE both bypassing Shield as designed;
+CONTRACT_WIPE leaving a real Starting contract untouched while wiping
+a real Optional one, the wiped instance's terminal status blocking any
+later `updateProgress()` from acting on it, and the no-optional-
+contracts case succeeding rather than failing; both contract
+punishments failing safely when Contracts is disabled; a punishment
+applied to one player never touching a second player's state;
+`ThreatManager`'s own state (level/harmful counter/cooldown)
+completely unchanged after applying a consequence, confirmed by both
+state comparison and a source-text check that `threatConsequences.js`
+never calls into it; source-text checks confirming `engine/app.js`
+doesn't reference either Threat manager and `eventExecutor.js`/
+`popup.js` contain zero `Threat` references. Also ran a small separate
+regression check confirming the three new `contractManager.js` methods
+follow the file's existing disabled-guard convention and that the
+ordinary enabled Starting-Contract flow is unaffected.
+
+Not tested, because nothing exists yet to test it against: when a
+punishment actually gets triggered during real play, Pass interaction,
+or Information Board/Notification display of Threat state.
+
+### Next unfinished step
+
+Wiring `eventExecutor.js` to call
+`ThreatManager.registerHarmfulEvent(playerId)` when a harmful event
+resolves, and calling `ThreatConsequences.apply()` when that reports a
+punishment. Also still open: Pass skipping the roll (`popup.js`),
+`ThreatManager.initialize()` from `engine/app.js`, and Information
+Board / Notification display of Threat state.

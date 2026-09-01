@@ -563,6 +563,99 @@ source of tile data changes.
 
 ---
 
+## VERIFIED — Threat Engine, Step 3: threatConsequences.js (punishment application, no integration)
+
+**Verified against commit:** `2e1e8a3`
+
+**Systems/files involved:** `js/managers/threatConsequences.js` (new —
+single entry point `apply(playerId, punishmentKey)`, five per-punishment
+handlers, shared `_shieldBlocks()` helper), `js/managers/contractManager.js`
+(additive — new `contractsLocked` state reset in `initialize()`/
+`startGame()`; three new public methods
+`isOptionalContractsBlocked`/`blockOptionalContracts`/
+`wipeOptionalContracts`; one guard line added to each of
+`offerOptionalContract()` and `checkTrigger()`), `index.html` (one
+script tag). Reads `GameNight.players`, `player.shield`, `player.score`
+(existing globals); reads and calls the new `ContractManager` public
+methods; reads (does not modify) `EventExecutor.consumeShieldIfPresent`.
+Not called from `eventExecutor.js`, `popup.js`, `engine/app.js`, or
+`ThreatManager` — no gameplay integration in this step.
+
+**What was tested (31-part Node test against the real files, run
+through `vm` — `threatDatabase.js`, `contractDatabase.js`,
+`eventExecutor.js`, `contractManager.js`, `threatManager.js`, and
+`threatConsequences.js` all loaded as the actual project files, not
+reimplementations):**
+- Invalid player ID and unknown punishment key both fail safely
+  (`applied: false` with a reason, zero state change, no exception).
+- SHIELD_BREAK: removes the Shield and reports success when the
+  player has one; fails safely with `requires-shield-but-player-has-none`
+  when they don't (validated independently inside
+  `threatConsequences.js`, not just trusted from the caller).
+- POINT_DRAIN: removes exactly `floor(score * 0.5)` (verified 101 →
+  drains 50, leaves 51); fully blocked and Shield consumed when the
+  player has one (score unchanged, shield now false); does not throw
+  and stays at 0 when the player already has 0 points.
+- LOSE_ALL_POINTS: zeroes the score and reports the previous value;
+  fully blocked and Shield consumed when the player has one; succeeds
+  as a no-op when already at 0.
+- CONTRACT_LOCK: calls the real `ContractManager.blockOptionalContracts`
+  (confirmed via `isOptionalContractsBlocked` afterward); leaves the
+  player's existing active contract count unchanged; still applies
+  with `shield: true` (bypasses Shield, per the database); confirmed
+  `offerOptionalContract()` now actually returns `null` for a locked
+  player.
+- CONTRACT_WIPE: after a real `startGame()` assigns one Starting
+  contract and a real Optional contract is assigned via
+  `ContractManager._assign()`, wiping leaves the Starting contract
+  active and untouched, marks only the Optional instance with status
+  `"wiped"` (not `"completed"`/`"failed"`), pays no reward, and a
+  subsequent `updateProgress()` call with a huge amount against the
+  wiped instance has no effect (still `"wiped"`, score unchanged) —
+  confirming the terminal state actually prevents reuse. Also
+  confirmed it succeeds (`applied: true`, empty wiped list) rather
+  than failing when the player has no Optional contracts at all, and
+  that it applies with `shield: false` (bypasses Shield).
+- Both contract punishments fail safely with `contracts-disabled` when
+  `ContractManager.enabled` is false.
+- Applying a punishment to one player leaves a second player's score
+  and Shield completely untouched.
+- Confirmed via a spy that POINT_DRAIN's Shield check actually calls
+  through to the real `EventExecutor.consumeShieldIfPresent`, not a
+  reimplementation.
+- Confirmed `ThreatManager`'s level/harmful-counter/cooldown state is
+  completely unchanged after `ThreatConsequences.apply()` runs, and by
+  source-text check that `threatConsequences.js` never calls into
+  `ThreatManager` at all — the two files stay decision/execution-split
+  as designed.
+- Confirmed by source-text check that `engine/app.js` references
+  neither `ThreatManager` nor `ThreatConsequences`, and that
+  `eventExecutor.js`/`popup.js` contain no `Threat` reference at all —
+  no gameplay integration was accidentally introduced.
+- `index.html` div-tag balance unchanged (27/27) after the script-tag
+  insertion.
+- Separate targeted regression check against the real (unmodified
+  logic) `contractManager.js`: the disabled-Contracts no-op guard still
+  holds for the three new methods exactly like every existing method,
+  and the normal enabled Starting-Contract assignment flow from
+  `startGame()` is unaffected by the additions.
+
+**Explicitly NOT tested (because nothing exists yet to test it
+against):** anything about *when* a punishment gets applied during
+real play (no `eventExecutor.js`/`popup.js` hook exists), Pass
+interaction with the punishment roll, Information Board or
+Notification display of Threat state, or `ThreatManager.initialize()`
+being called from the real game loop.
+
+**Would require rerun if:** any `ThreatPunishments` entry's
+`bypassesShield`/`requiresShield` value changes, any handler in
+`threatConsequences.js` changes, `ContractManager`'s new
+lock/wipe methods or their guard lines change, `_getDefinition()`'s
+`category` field semantics change, or
+`EventExecutor.consumeShieldIfPresent()`'s behavior changes.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

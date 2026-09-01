@@ -1,7 +1,7 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `cc61d44` — "Threat Engine: ThreatManager
-(`threatManager.js`) — step 2 of N"
+**Last updated against commit:** `2e1e8a3` — "Threat Engine:
+ThreatConsequences (`threatConsequences.js`) — step 3 of N"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -74,15 +74,52 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
     only, directly after `gameEndManager.js`); `GameNight.initialize()`
     does NOT call `ThreatManager.initialize()` yet — that's part of
     real game-loop integration, a later step.
-  - NOT STARTED: `ThreatConsequences` (executing a selected
-    punishment's effect), integration into `eventExecutor.js`
-    (calling `registerHarmfulEvent()` when a harmful event resolves),
-    `popup.js` (Pass skips the roll), `contractManager.js`
-    (`blockOptionalContracts()` / `wipeOptionalContracts()` + a wiped
-    terminal state), `informationBoard.js` (show current Threat Level
-    + hidden-event count, no location hints), `notificationManager.js`
+  - DONE: `js/managers/threatConsequences.js` — acts, doesn't decide.
+    Single public entry point `apply(playerId, punishmentKey)`:
+    validates the player exists and the punishment key is real,
+    independently re-checks `requiresShield` against the target's
+    actual Shield status, then dispatches to one of five handlers.
+    `SHIELD_BREAK` sets `player.shield = false` directly (it bypasses
+    Shield by design — its purpose IS to destroy it). `CONTRACT_LOCK`
+    calls the new `ContractManager.blockOptionalContracts(playerId)`.
+    `CONTRACT_WIPE` calls the new
+    `ContractManager.wipeOptionalContracts(playerId)`. `POINT_DRAIN`
+    (`floor(score * 0.5)`) and `LOSE_ALL_POINTS` (`score = 0`) each
+    first check Shield via a shared `_shieldBlocks()` helper that
+    reuses `EventExecutor.consumeShieldIfPresent()` (existing public
+    method, not duplicated) — a Shield fully blocks and consumes
+    itself against these two, matching each punishment's
+    `bypassesShield` flag in `threatDatabase.js`. Every path returns a
+    `{ applied, punishment, playerId, ... }` result; nothing throws on
+    bad input. Never reads or writes any `ThreatManager` state — purely
+    an executor of what it's told. Wired into `index.html` (script tag
+    only, directly after `threatManager.js`); not called from anywhere.
+  - `js/managers/contractManager.js` gained three small additive public
+    methods to support the two contract punishments, following its
+    existing `if(!this.enabled) return;` no-op guard convention exactly
+    like every other public method in the file:
+    `isOptionalContractsBlocked(playerId)`,
+    `blockOptionalContracts(playerId)` (sets a per-player
+    `contractsLocked` flag; existing active contracts are completely
+    untouched), `wipeOptionalContracts(playerId)` (marks each active
+    contract whose *definition* has `category === "optional"` — not
+    `"starting"` — with a new terminal status `"wiped"`, distinct from
+    `"completed"`/`"failed"`, so `completeContract()`/
+    `updateProgress()`/`_dispatch()` — all gated on
+    `status === "active"` — can never act on it again; no reward can be
+    accidentally paid). `offerOptionalContract()` and `checkTrigger()`
+    were each given one extra guard line so they respect the lock.
+    `contractsLocked` resets alongside `firedTriggers` in both
+    `initialize()` and `startGame()`.
+  - NOT STARTED: integration into `eventExecutor.js` (calling
+    `registerHarmfulEvent()` when a harmful event resolves, then
+    `ThreatConsequences.apply()` on a hit), `popup.js` (Pass skips the
+    roll), `informationBoard.js` (show current Threat Level +
+    hidden-event count, no location hints), `notificationManager.js`
     calls for level-change/punishment events, and calling
     `ThreatManager.initialize()`/`.reset()` from the real game loop.
+    Nothing in normal gameplay calls `ThreatManager` or
+    `ThreatConsequences` yet.
 
 ## Systems: prepared but intentionally NOT implemented (architecture only)
 
@@ -126,7 +163,9 @@ See BACKLOG.md for the full list of approved-but-not-started features.
 
 ## Currently being developed
 
-Threat Engine — data layer and `ThreatManager` (decision logic) both
-complete; nothing executes a punishment yet and nothing calls this
-manager from real gameplay. Next step: `ThreatConsequences` — actually
-applying a selected punishment's effect to a player.
+Threat Engine — data layer, `ThreatManager` (decision logic), and
+`ThreatConsequences` (application logic) all complete in isolation.
+Still nothing calls either manager from real gameplay. Next step:
+wiring `eventExecutor.js` to call `ThreatManager.registerHarmfulEvent()`
+when a harmful event resolves, and `ThreatConsequences.apply()` when
+that call reports a punishment.

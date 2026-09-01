@@ -41,6 +41,12 @@ const ContractManager = {
     // be shown -- see checkTrigger()).
     firedTriggers: {},
 
+    // playerId -> true once that player is blocked from receiving any
+    // further Optional Contracts. Existing active contracts (Starting
+    // or Optional) are completely unaffected by this flag -- it only
+    // gates future offers/triggers. Set via blockOptionalContracts().
+    contractsLocked: {},
+
     // The maximum number of contracts (Starting + Optional combined) a
     // player may have active at once.
     maxActiveContracts: 2,
@@ -54,6 +60,8 @@ const ContractManager = {
         this.nextInstanceId = 1;
 
         this.firedTriggers = {};
+
+        this.contractsLocked = {};
 
         // A minimal built-in type, registered here purely to prove the
         // registry pattern works end-to-end. It does nothing on any
@@ -93,6 +101,8 @@ const ContractManager = {
         this.nextInstanceId = 1;
 
         this.firedTriggers = {};
+
+        this.contractsLocked = {};
 
         if(!this.enabled){
 
@@ -164,6 +174,12 @@ const ContractManager = {
 
         }
 
+        if(this.isOptionalContractsBlocked(playerId)){
+
+            return null;
+
+        }
+
         const optionalDefs = ContractDatabase.filter(
 
             def => def.category === "optional"
@@ -203,6 +219,12 @@ const ContractManager = {
     async checkTrigger(triggerKey, playerId) {
 
         if(!this.enabled){
+
+            return;
+
+        }
+
+        if(this.isOptionalContractsBlocked(playerId)){
 
             return;
 
@@ -394,6 +416,88 @@ const ContractManager = {
             i => i.status === "active"
 
         );
+
+    },
+
+    // =========================================
+    // External punishment/consequence integration points
+    // =========================================
+    // These exist so other systems (currently: ThreatConsequences, not
+    // yet wired into gameplay) never need to reach into `assignments`
+    // or `contractsLocked` directly. Nothing calls these yet.
+
+    isOptionalContractsBlocked(playerId) {
+
+        return !!this.contractsLocked[playerId];
+
+    },
+
+    // Blocks this player from receiving any further Optional
+    // Contracts. Existing active contracts (Starting or Optional) are
+    // completely untouched -- this only gates future
+    // offerOptionalContract()/checkTrigger() calls.
+    blockOptionalContracts(playerId) {
+
+        if(!this.enabled){
+
+            return;
+
+        }
+
+        this.contractsLocked[playerId] = true;
+
+    },
+
+    // Removes this player's active Optional Contracts only -- Starting
+    // Contracts are never touched, matched by definition.category, not
+    // by any assumption about instance order or count. Wiped instances
+    // get a distinct "wiped" status (not "completed" or "failed"), so
+    // completeContract()/updateProgress()/_dispatch() -- all of which
+    // gate on status === "active" -- can never act on them again and
+    // no reward can be accidentally paid out. Does not change this
+    // player's contractsLocked state. Returns the list of instances
+    // actually wiped (empty if the player had none).
+    wipeOptionalContracts(playerId) {
+
+        if(!this.enabled){
+
+            return [];
+
+        }
+
+        const instances = this.assignments[playerId] || [];
+
+        const wiped = [];
+
+        instances.forEach(instance => {
+
+            if(instance.status !== "active"){
+
+                return;
+
+            }
+
+            const def = this._getDefinition(instance.contractId);
+
+            if(!def || def.category !== "optional"){
+
+                return;
+
+            }
+
+            instance.status = "wiped";
+
+            wiped.push(instance);
+
+        });
+
+        if(wiped.length > 0){
+
+            this.renderPanel();
+
+        }
+
+        return wiped;
 
     },
 
