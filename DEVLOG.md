@@ -1918,3 +1918,94 @@ initialization/reset from `engine/app.js`'s `GameNight.initialize()`
 (closing the same-session New Game persistence gap), or Information
 Board / Notification display of current Threat Level. Whichever is
 instructed next.
+
+## Entry 20 — Threat Engine: Step 5 (initialize/reset lifecycle wiring)
+
+### What changed
+
+Traced every place the game actually resets per-game managers before
+writing any code (`grep` for `Board.build()`/`QuestionManager.reset()`
+across the whole codebase). Found exactly two genuine "new game
+begins" boundaries — not one, and notably **not** `engine/app.js`:
+
+- `js/ui/ui.js`'s Start Game button click handler (Home → Setup →
+  Start Game, brand new players).
+- `js/managers/gameEndManager.js`'s `newGameWithSamePlayers()` — the
+  actual "click New Game within the same browser session" path,
+  replaying immediately with the same players.
+
+Both already reset every other per-game manager the same way
+(`ContractManager.startGame()`, `HistoryManager.initialize()`,
+`Timer.initialize()`, `GameEndManager.initialize()`,
+`QuestionManager.reset()`, `Board.build()`). `ThreatManager.initialize()`
+was added to both, at the same relative position (right before
+`QuestionManager.reset()`), following that exact existing convention.
+
+`engine/app.js`'s `GameNight.initialize()` was deliberately left
+untouched. It only ever runs once, at `window.onload` — confirmed by
+tracing its only call site — and is never re-invoked by either of the
+two real new-game click paths above. Calling `ThreatManager.initialize()`
+there instead of (or in addition to) the two real hook sites would
+have left the exact same-session carryover this step exists to fix:
+Threat Level, harmful-event count, and every player's cooldown would
+have silently persisted across a "New Game" click. It would also have
+been a pure no-op in practice, since `ThreatManager`'s own object-literal
+defaults (`currentLevelIndex: 0`, `harmfulEventsResolved: 0`,
+`playerCooldowns: {}`) already equal exactly what `initialize()`
+produces — there's nothing for a page-load call to actually fix that
+isn't already true the instant the script loads.
+
+A third `QuestionManager.reset()` call site exists
+(`gameEndManager.js`'s `nextSuddenDeathQuestion()`), but it's a
+mid-tiebreak question-pool refill fallback within the *same* game, not
+a new-game boundary — read its surrounding code and existing comment
+before ruling it out, rather than assuming.
+
+`initialize()` was used (not `.reset()`) for consistency with every
+sibling call at both hook sites (`HistoryManager.initialize()`,
+`GameEndManager.initialize()`, `Timer.initialize()`) — `ThreatManager`'s
+own `initialize()` is a one-line wrapper around `reset()`, so the two
+are behaviorally identical; this is purely a naming-convention choice
+matching the surrounding code.
+
+### Not done in this entry (explicitly, per instruction)
+
+- No changes to `threatManager.js`, `threatConsequences.js`,
+  `threatDatabase.js`, `eventExecutor.js`, `popup.js`,
+  `informationBoard.js`, `notificationManager.js`, or
+  `contractManager.js` — none were necessary.
+- No changes to `engine/app.js` — deliberately, per the reasoning
+  above (the "preferred" file named in the task turned out to be the
+  wrong lifecycle point once actually traced).
+- No Pass interaction, no Information Board Threat display, no Threat
+  notifications.
+
+### Verification performed
+
+20-part Node test (via `vm`, against the real files). Traced every
+`Board.build()`/`QuestionManager.reset()` call site first to confirm
+exactly two real new-game boundaries exist (and that a third,
+Sudden-Death-related call is unrelated). Dirtied `ThreatManager`'s
+state via its own real public API (drove it to CRITICAL, registered
+several harmful events against a real player), then ran the actual
+Start Game handler body (regex-extracted straight from the real
+`ui.js`, not hand-copied) and separately called the real
+`GameEndManager.newGameWithSamePlayers()` directly — both confirmed
+Threat Level back to NORMAL, harmful-event counter back to 0, and
+per-player cooldown gone, with `newGameWithSamePlayers()`'s existing
+score/shield reset behavior unchanged (regression). Confirmed exactly
+one `ThreatManager.initialize()` call exists in each of the two
+modified files (no accidental duplicate resets). Confirmed via
+source-text checks that `engine/app.js` has zero `ThreatManager`
+references, `eventExecutor.js` has no `ThreatManager.initialize`/
+`.reset` reference, and `popup.js`/`informationBoard.js`/
+`notificationManager.js` all have zero `Threat` references at all.
+Confirmed via individual `git diff --stat` checks that
+`threatManager.js`, `threatConsequences.js`, `threatDatabase.js`, and
+`contractManager.js` have zero diff from this step.
+
+### Next unfinished step
+
+One of: Pass skipping the punishment roll (`popup.js`), Information
+Board Threat display, or Threat notifications. Whichever is
+instructed next.

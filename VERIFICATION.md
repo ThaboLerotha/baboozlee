@@ -748,6 +748,76 @@ since `ThreatManager.initialize()`/`.reset()` still isn't called from
 
 ---
 
+## VERIFIED — Threat Engine, Step 5: initialize/reset lifecycle wiring (ui.js, gameEndManager.js)
+
+**Verified against commit:** `12d1088`
+
+**Systems/files involved:** `js/ui/ui.js` (Start Game button click
+handler — 12 additive lines, one `ThreatManager.initialize()` call),
+`js/managers/gameEndManager.js` (`newGameWithSamePlayers()` — 11
+additive lines, same call). `engine/app.js` deliberately NOT
+modified — traced and confirmed its `GameNight.initialize()` only
+runs once, on `window.onload`, and is never re-invoked by either real
+new-game click path, so it was the wrong lifecycle point despite being
+the "preferred" file named in the task. `threatManager.js`,
+`threatConsequences.js`, `threatDatabase.js`, `eventExecutor.js`,
+`popup.js`, `informationBoard.js`, `notificationManager.js`,
+`contractManager.js` all confirmed unmodified.
+
+**What was tested (20-part Node test against the real files, run
+through `vm`):**
+- Traced every `Board.build()`/`QuestionManager.reset()` call site in
+  the codebase first (`grep` across all JS files) to confirm exactly
+  two genuine "new game" boundaries exist (`ui.js`'s Start Game
+  handler, `gameEndManager.js`'s `newGameWithSamePlayers()`) and that
+  a third `QuestionManager.reset()` call (inside
+  `nextSuddenDeathQuestion()`) is an unrelated mid-game pool-refill
+  fallback, not a new-game boundary — confirmed by reading its
+  surrounding code and comment before ruling it out.
+- Simulated "game 1 happened, dirtying Threat state via its own real
+  public API" (drove board progress to CRITICAL and called
+  `registerHarmfulEvent` several times against a real player), then
+  extracted and ran the **actual** Start Game click handler body
+  straight out of `ui.js` (regex-extracted from the real file, not
+  hand-copied logic) against the real `ThreatManager` — confirmed
+  level back to `NORMAL`, harmful-event counter back to 0, and the
+  previous game's cooldown for that player gone.
+- Same dirty-then-reset simulation against the **actual**
+  `GameEndManager.newGameWithSamePlayers()` method, called directly
+  (real function, not extracted/reimplemented) — same three
+  confirmations, plus confirmed the method's existing player
+  score/shield reset behavior is unchanged (regression).
+- Confirmed via regex count that `ui.js` and `gameEndManager.js` each
+  contain **exactly one** `ThreatManager.initialize()` call — no
+  accidental duplicate registration of the reset.
+- Confirmed via source-text check that `engine/app.js` contains zero
+  `ThreatManager` references — the page-load path was correctly left
+  alone rather than adding a redundant third call (the manager's own
+  object-literal defaults already equal what `initialize()`/`reset()`
+  produce, so a page-load call would have been a pure no-op anyway).
+- Confirmed via source-text check that `eventExecutor.js` contains no
+  `ThreatManager.initialize`/`ThreatManager.reset` reference — Step 4's
+  harmful-event registration wiring is completely unrelated to and
+  unaffected by this step.
+- Confirmed via source-text checks that `popup.js`,
+  `informationBoard.js`, and `notificationManager.js` each contain
+  zero `Threat` references — no Pass/UI/notification work was
+  introduced.
+- Confirmed via `git diff --stat` on each file individually that
+  `threatManager.js`, `threatConsequences.js`, `threatDatabase.js`,
+  and `contractManager.js` all have zero diff from this step.
+
+**Would require rerun if:** either hook site's surrounding new-game
+setup sequence is restructured, a third genuine new-game boundary is
+added anywhere in the codebase, or `ThreatManager.initialize()`'s
+behavior changes.
+
+**Known, intentionally deferred (not a defect):** Pass still doesn't
+skip the punishment roll; Information Board doesn't show Threat Level
+yet; no Threat notifications exist yet.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

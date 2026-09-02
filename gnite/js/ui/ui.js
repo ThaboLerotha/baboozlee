@@ -116,6 +116,18 @@ const UI = {
 
                 }
 
+                // Threat Engine game state is per-game, same as
+                // Contracts/History/Timer above -- GameNight.initialize()
+                // (window.onload, app.js) only runs once per page load,
+                // never again on this click, so it can't be relied on to
+                // reset this. This IS the actual "a new game begins"
+                // boundary.
+                if(typeof ThreatManager !== "undefined"){
+
+                    ThreatManager.initialize();
+
+                }
+
                 QuestionManager.reset();
 
                 Board.build();

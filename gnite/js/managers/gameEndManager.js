@@ -626,6 +626,17 @@ ${summaryRows}
 
         }
 
+        // Same reasoning as the Start Game handler in ui.js -- this is
+        // the "click New Game within the same browser session" path
+        // the previous game's Threat state would otherwise silently
+        // carry over through, since app.js's GameNight.initialize()
+        // never runs again here.
+        if(typeof ThreatManager !== "undefined"){
+
+            ThreatManager.initialize();
+
+        }
+
         QuestionManager.reset();
 
         Board.build();

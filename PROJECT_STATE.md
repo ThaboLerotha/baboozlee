@@ -1,7 +1,10 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `2642da8` — "Threat Engine:
-harmful-event integration (`eventExecutor.js`) — step 4 of N"
+**Last updated against commit:** `12d1088` — "Threat Engine:
+initialize/reset lifecycle wiring (`ui.js`, `gameEndManager.js`) —
+step 5 of N" (note: the previous header here read `2642da8`, one
+amend-generation stale versus the actual commit that landed on
+`origin/main`, `c77dbb3` — corrected while already editing this line)
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -138,13 +141,24 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
     probability, level, weight, or cooldown logic exists in this file;
     it only reads `ThreatManager`'s return value and conditionally
     forwards to `ThreatConsequences`.
+  - DONE: **per-game initialization/reset is live.**
+    `ThreatManager.initialize()` is now called from the two actual
+    "a new game begins" boundaries traced in the real code —
+    `ui.js`'s Start Game button click handler, and
+    `gameEndManager.js`'s `newGameWithSamePlayers()` (the "click New
+    Game within the same browser session" path). `engine/app.js`'s
+    `GameNight.initialize()` was deliberately NOT used for this: it
+    only ever runs once, on `window.onload`, and traced inspection
+    confirmed it does not run again on either of the two real
+    new-game click paths — using it alone would have left the exact
+    same-session carryover bug this step exists to close. Both hook
+    sites mirror the existing pattern every other per-game manager
+    already follows at the same two call sites (`ContractManager`,
+    `HistoryManager`, `Timer`, `GameEndManager` itself).
   - NOT DONE YET: Pass skipping the roll (`popup.js`),
-    `ThreatManager.initialize()`/`.reset()` being called from
-    `engine/app.js` (so Threat state currently persists across a "New
-    Game" click within the same session — a known, intentionally
-    deferred gap), `informationBoard.js` (show current Threat Level +
-    hidden-event count, no location hints), `notificationManager.js`
-    calls for level-change/punishment events.
+    `informationBoard.js` (show current Threat Level + hidden-event
+    count, no location hints), `notificationManager.js` calls for
+    level-change/punishment events.
 
 ## Systems: prepared but intentionally NOT implemented (architecture only)
 
@@ -188,10 +202,9 @@ See BACKLOG.md for the full list of approved-but-not-started features.
 
 ## Currently being developed
 
-Threat Engine — data layer, `ThreatManager`, `ThreatConsequences`, and
-now the harmful-event → registration → punishment-application chain
-are all live in real gameplay. Still not implemented: Pass skipping
-the roll, Threat state initialization/reset from `engine/app.js`
-(New Game currently leaves Threat state carried over — a known gap),
-and any Threat UI/notifications. Next step: one of those three,
+Threat Engine — data layer, `ThreatManager`, `ThreatConsequences`, the
+harmful-event registration/punishment chain, and now per-game
+initialization/reset are all live in real gameplay. Still not
+implemented: Pass skipping the punishment roll, Information Board
+Threat display, Threat notifications. Next step: one of those three,
 whichever is instructed next.
