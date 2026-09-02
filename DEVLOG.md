@@ -1818,3 +1818,103 @@ resolves, and calling `ThreatConsequences.apply()` when that reports a
 punishment. Also still open: Pass skipping the roll (`popup.js`),
 `ThreatManager.initialize()` from `engine/app.js`, and Information
 Board / Notification display of Threat state.
+
+## Entry 19 — Threat Engine: Step 4 (harmful-event integration)
+
+### What changed
+
+`js/managers/eventExecutor.js` only — the first point where the
+Threat Engine participates in real gameplay.
+
+- New `registerThreatHarm(playerId)` helper on `EventExecutor`. Makes
+  no decisions: forwards to `ThreatManager.registerHarmfulEvent(playerId)`,
+  and if the result has `punished: true`, forwards to
+  `ThreatConsequences.apply(playerId, result.punishment)`. Guarded the
+  same way every other optional-manager call in this file already is.
+- One call to `this.registerThreatHarm(...)` added inside each of the
+  8 Harmful-category handlers, at the exact point each one already
+  knows who the event's outcome belongs to:
+  - `bombSelf` — self (current player). No `recordOutcome()` call
+    existed here before (`Score.subtractPoints()` already writes its
+    own History entry), so `Players.getCurrentPlayer()` is fetched
+    fresh just to identify who to register against.
+  - `bombOther`, `freeze` — the target, in both the normal-damage
+    branch and the Shield-blocked branch. A game-Shield block is a
+    real, complete outcome (the event resolved, only the damage was
+    nullified) — both branches already call `recordOutcome()`, so both
+    register.
+  - `steal` — the target/victim, **not** the thief `recordOutcome()`
+    names in its History message. Steal has one actual harmed party
+    (the person who lost points); the thief benefited, so isn't who
+    the Threat Engine should treat as "harmed."
+  - `badJackpot`, `meteor`, `noEscape` — the activating player, since
+    these are board-wide effects with no single individual victim.
+    Matches the attribution `recordOutcome()` already uses for each.
+  - `timeWarp` — the current player, in **both** branches (timer
+    running vs. no active timer). Both branches already call
+    `recordOutcome()` with a real outcome description — a no-op timer
+    is a complete resolution, not a cancellation.
+- A "cancelled" path — `bombOther`/`freeze`/`steal` all bail out early
+  with `console.warn(...)` and no `recordOutcome()` call when
+  `getEligibleTargets()` returns empty — never registers, since no
+  player or outcome was ever determined. This is the one case
+  genuinely excluded per instruction ("an event was attempted but
+  cancelled").
+- Beneficial (`DOUBLE_POINTS`/`BONUS_TURN`/`SHIELD`/`GIFT`/`JACKPOT`)
+  and Neutral (`CHAOS`/`CLEANUP`) handlers are completely untouched —
+  `registerThreatHarm` is called from nowhere except the 8 Harmful
+  handlers listed above.
+- `execute()` itself is unchanged — it was already confirmed (before
+  writing any code) to be called from exactly one place in the whole
+  codebase (`popup.js`'s shared `_resolveTile()` helper), so there is
+  no multi-callback risk of a harmful event's handler running twice
+  for one tile resolution.
+
+### Not done in this entry (explicitly, per instruction)
+
+- No changes to `threatManager.js`, `threatConsequences.js`,
+  `threatDatabase.js`, `popup.js`, `engine/app.js`,
+  `contractManager.js`, `informationBoard.js`, or
+  `notificationManager.js` — none were necessary; `eventExecutor.js`'s
+  existing public API surface (`ThreatManager`/`ThreatConsequences`,
+  already built in Steps 2–3) covered everything this step needed.
+- No punishment probability/weight/level/cooldown logic exists in
+  `eventExecutor.js` — confirmed by source-text check, not just belief.
+- No Pass interaction, no Threat UI, no Threat notifications, no
+  `ThreatManager.initialize()`/`.reset()` call from `engine/app.js` —
+  Threat state currently persists across a same-session "New Game"
+  click as a result; a known, explicitly deferred gap, not a defect.
+
+### Verification performed
+
+36-part Node test (via `vm`, loading the real `threatDatabase.js`,
+`contractDatabase.js`, `contractManager.js`, `threatManager.js`,
+`threatConsequences.js`, and the modified `eventExecutor.js` together —
+spies wrapped around the real `ThreatManager.registerHarmfulEvent`/
+`ThreatConsequences.apply`, not reimplementations), covering: harmless/
+neutral events never registering; every one of the 8 Harmful handlers
+(including both branches of `bombOther`/`freeze`/`steal`/`timeWarp`)
+registering exactly once against the correct player, with existing
+point/state effects in each still unchanged (regression); the
+no-eligible-target cancellation path never registering; a no-punishment
+result never calling `ThreatConsequences.apply`; a forced punishment
+calling `apply()` exactly once with the exact playerId and punishment
+key `ThreatManager` selected, for both a Shield-eligible and a
+no-Shield pick, with no Shield-inspection happening in
+`eventExecutor.js` itself; cooldown behavior (register-but-no-apply
+while on cooldown) confirmed as `ThreatManager`'s own doing via source
+inspection; source-text checks confirming zero decision-logic
+duplication (`ThreatLevels`/`ThreatPunishments`/`punishmentChance`/
+`.weight`) and zero references to the Threat Engine anywhere in
+`popup.js`/`engine/app.js`/`informationBoard.js`/
+`notificationManager.js`; and a small regression check on two
+untouched Beneficial handlers. `git diff --stat` confirmed the entire
+change is 94 additive lines in exactly one file.
+
+### Next unfinished step
+
+One of: Pass skipping the punishment roll (`popup.js`), Threat state
+initialization/reset from `engine/app.js`'s `GameNight.initialize()`
+(closing the same-session New Game persistence gap), or Information
+Board / Notification display of current Threat Level. Whichever is
+instructed next.

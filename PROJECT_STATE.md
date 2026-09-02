@@ -1,7 +1,7 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `2e1e8a3` — "Threat Engine:
-ThreatConsequences (`threatConsequences.js`) — step 3 of N"
+**Last updated against commit:** `2642da8` — "Threat Engine:
+harmful-event integration (`eventExecutor.js`) — step 4 of N"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -111,15 +111,40 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
     were each given one extra guard line so they respect the lock.
     `contractsLocked` resets alongside `firedTriggers` in both
     `initialize()` and `startGame()`.
-  - NOT STARTED: integration into `eventExecutor.js` (calling
-    `registerHarmfulEvent()` when a harmful event resolves, then
-    `ThreatConsequences.apply()` on a hit), `popup.js` (Pass skips the
-    roll), `informationBoard.js` (show current Threat Level +
+  - DONE: **harmful-event integration is live** — `eventExecutor.js`
+    now calls into the Threat Engine. This is the first point where
+    the Threat Engine participates in real gameplay. A new
+    `registerThreatHarm(playerId)` helper on `EventExecutor` forwards
+    to `ThreatManager.registerHarmfulEvent(playerId)` and, if the
+    result reports `punished: true`, forwards to
+    `ThreatConsequences.apply(playerId, result.punishment)`. Every one
+    of the 8 Harmful-category event handlers
+    (`BOMB_SELF`/`BOMB_OTHER`/`FREEZE`/`STEAL`/`BAD_JACKPOT`/`METEOR`/
+    `TIME_WARP`/`NO_ESCAPE`) calls it exactly once at its own
+    resolution point, against whichever player the event's outcome
+    already belongs to (matching each handler's existing
+    `recordOutcome()` attribution, **except** `STEAL`, which
+    deliberately registers against the victim/target rather than the
+    thief `recordOutcome()` names, since the victim is who was
+    actually harmed). A "cancelled" path (no eligible target found —
+    `BOMB_OTHER`/`FREEZE`/`STEAL` all have this) never registers, since
+    no player or outcome was ever determined. A game-Shield-blocked
+    targeted event (e.g. a Bomb absorbed by the target's Shield) still
+    registers — the event fully resolved, only its damage was
+    nullified; `eventExecutor.js` does not special-case that. Beneficial
+    and Neutral events are completely untouched — `registerThreatHarm`
+    is called from nowhere except the 8 Harmful handlers.
+    `eventExecutor.js` makes zero Threat decisions itself — no
+    probability, level, weight, or cooldown logic exists in this file;
+    it only reads `ThreatManager`'s return value and conditionally
+    forwards to `ThreatConsequences`.
+  - NOT DONE YET: Pass skipping the roll (`popup.js`),
+    `ThreatManager.initialize()`/`.reset()` being called from
+    `engine/app.js` (so Threat state currently persists across a "New
+    Game" click within the same session — a known, intentionally
+    deferred gap), `informationBoard.js` (show current Threat Level +
     hidden-event count, no location hints), `notificationManager.js`
-    calls for level-change/punishment events, and calling
-    `ThreatManager.initialize()`/`.reset()` from the real game loop.
-    Nothing in normal gameplay calls `ThreatManager` or
-    `ThreatConsequences` yet.
+    calls for level-change/punishment events.
 
 ## Systems: prepared but intentionally NOT implemented (architecture only)
 
@@ -163,9 +188,10 @@ See BACKLOG.md for the full list of approved-but-not-started features.
 
 ## Currently being developed
 
-Threat Engine — data layer, `ThreatManager` (decision logic), and
-`ThreatConsequences` (application logic) all complete in isolation.
-Still nothing calls either manager from real gameplay. Next step:
-wiring `eventExecutor.js` to call `ThreatManager.registerHarmfulEvent()`
-when a harmful event resolves, and `ThreatConsequences.apply()` when
-that call reports a punishment.
+Threat Engine — data layer, `ThreatManager`, `ThreatConsequences`, and
+now the harmful-event → registration → punishment-application chain
+are all live in real gameplay. Still not implemented: Pass skipping
+the roll, Threat state initialization/reset from `engine/app.js`
+(New Game currently leaves Threat state carried over — a known gap),
+and any Threat UI/notifications. Next step: one of those three,
+whichever is instructed next.

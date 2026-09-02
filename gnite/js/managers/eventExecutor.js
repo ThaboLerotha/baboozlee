@@ -202,12 +202,55 @@ const EventExecutor = {
     },
 
     // =========================================
+    // Threat Engine connection
+    // =========================================
+    //
+    // Step 4 of the Threat Engine. Every Harmful-category event
+    // handler below calls this exactly once, at the point it has
+    // already determined who the event's outcome belongs to -- the
+    // same player recordOutcome() attributes the event to (see each
+    // call site's own comment for which player that is and why).
+    //
+    // This function makes zero decisions of its own: it forwards to
+    // ThreatManager.registerHarmfulEvent(), and if that reports a
+    // punishment was selected, forwards that exact result to
+    // ThreatConsequences.apply(). It never inspects Shield state,
+    // Threat Level, cooldowns, or punishment weights -- those stay
+    // entirely owned by ThreatManager/ThreatConsequences. Guarded the
+    // same way every other optional-manager call in this codebase is.
+    registerThreatHarm(playerId){
+
+        if(typeof ThreatManager === "undefined"){
+
+            return;
+
+        }
+
+        const result = ThreatManager.registerHarmfulEvent(playerId);
+
+        if(result && result.punished && typeof ThreatConsequences !== "undefined"){
+
+            ThreatConsequences.apply(playerId, result.punishment);
+
+        }
+
+    },
+
+    // =========================================
     // Self Events
     // =========================================
 
+    // Harmful. Self-inflicted, so the affected player is always the
+    // one who drew the tile. No recordOutcome() call exists here
+    // today (Score.subtractPoints() already writes its own "Points
+    // Lost" History entry) -- Players.getCurrentPlayer() is fetched
+    // here purely to identify who the Threat Engine should register
+    // this resolution against.
     bombSelf(tile){
 
         Score.subtractPoints(200);
+
+        this.registerThreatHarm(Players.getCurrentPlayer().id);
 
     },
 
@@ -263,6 +306,8 @@ const EventExecutor = {
 
         if(eligible.length === 0){
 
+            // Cancelled: no target could ever be determined, no
+            // outcome was recorded. Not a Threat Engine registration.
             console.warn("Bomb Other: no eligible target players.");
 
             return;
@@ -291,6 +336,17 @@ const EventExecutor = {
 
             }
 
+            // The Bomb still resolved -- the Shield absorbed its
+            // damage, but the harmful event itself completed and
+            // produced a real outcome. Registered against the target,
+            // the player the event was actually about, matching
+            // recordOutcome() above. This is the game's own Shield
+            // mechanic (EventExecutor.consumeShieldIfPresent), a
+            // separate thing from any Shield check ThreatConsequences
+            // performs later for its own punishment -- eventExecutor.js
+            // does not special-case that downstream Shield at all.
+            this.registerThreatHarm(target.id);
+
             return;
 
         }
@@ -300,6 +356,8 @@ const EventExecutor = {
         this.recordOutcome(target.id, `${target.name} lost 200 points to a Bomb.`);
 
         Score.update();
+
+        this.registerThreatHarm(target.id);
 
     },
 
@@ -331,6 +389,8 @@ const EventExecutor = {
 
             Score.update();
 
+            this.registerThreatHarm(target.id);
+
             return;
 
         }
@@ -340,6 +400,8 @@ const EventExecutor = {
         this.recordOutcome(target.id, `${target.name} will skip their next turn.`);
 
         Score.update();
+
+        this.registerThreatHarm(target.id);
 
     },
 
@@ -371,6 +433,8 @@ const EventExecutor = {
 
             Score.update();
 
+            this.registerThreatHarm(target.id);
+
             return;
 
         }
@@ -392,6 +456,14 @@ const EventExecutor = {
         );
 
         Score.update();
+
+        // Registered against the victim (target), not the thief that
+        // recordOutcome() above names -- recordOutcome's message is
+        // about who did the stealing, but the Threat Engine's harmful-
+        // event registration is about who the harm actually happened
+        // to. Steal has one clear victim here (the person who lost
+        // points), unlike the thief, who benefited.
+        this.registerThreatHarm(target.id);
 
     },
 
@@ -479,6 +551,12 @@ const EventExecutor = {
 
         );
 
+        // Board-wide effect, no individual victim to target -- follows
+        // this codebase's existing convention (see recordOutcome()
+        // above) of attributing board-wide events to the activating
+        // player.
+        this.registerThreatHarm(player.id);
+
         // convertRandomEventTiles() -> convertTilesToStale() changes
         // which events remain hidden, but doesn't mark tiles used, so
         // it doesn't go through Board's markUsed()/markTilesUsed()
@@ -559,6 +637,10 @@ const EventExecutor = {
 
         );
 
+        // Board-wide effect, same attribution convention as Bad
+        // Jackpot above.
+        this.registerThreatHarm(player.id);
+
     },
 
     // =========================================
@@ -594,6 +676,12 @@ const EventExecutor = {
 
         }
 
+        // Both branches above call recordOutcome() -- this is a real,
+        // complete resolution either way (a no-op timer is a valid
+        // outcome, not a cancellation), so both register. Affects the
+        // current player's own timer, so they're the affected player.
+        this.registerThreatHarm(player.id);
+
     },
 
     // TODO (Phase: Pass System): once the pass system exists, No Escape
@@ -613,6 +701,12 @@ const EventExecutor = {
         this.recordOutcome(player.id, "No Escape removed every player's shield.");
 
         Score.update();
+
+        // Board-wide (every player's Shield is stripped), same
+        // attribution convention as Bad Jackpot/Meteor above -- one
+        // registration, against the activating player, matching
+        // recordOutcome().
+        this.registerThreatHarm(player.id);
 
     }
 
