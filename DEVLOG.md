@@ -2162,3 +2162,63 @@ literal double mouse-click in a running browser.
 
 One of: Information Board Threat display, or Threat notifications.
 Whichever is instructed next.
+
+## Entry 23 — Threat Engine: Step 7 (Information Board Threat display)
+
+### What changed
+
+`js/managers/informationBoard.js` only. Added a "Threat Status"
+section to the existing `render()` template, showing current Threat
+Level and Harmful Events Resolved. Sourced entirely from
+`ThreatManager.getSummary()` — the public API Step 2 built explicitly
+for this purpose (its own comment in `threatManager.js` already says
+"for later use e.g. Information Board display"). `threatManager.js`
+was not modified; only its existing public method is called.
+
+No new HTML or CSS: reuses the existing `#infoBoard` panel, `<h3>`
+section headers, and `.infoBoardLine` paragraph class exactly the way
+Treasure Status and Hidden Event Status already do. The panel's whole
+`innerHTML` is still rebuilt from scratch on every `render()` call
+(unchanged pattern), so the Threat section can never go stale between
+calls, the same guarantee Hidden Event Status already has against
+`GameNight.board`.
+
+Guarded with `typeof ThreatManager !== "undefined"` (falls back to
+NORMAL/0), matching this codebase's existing convention for optional-
+manager reads elsewhere in the file (`EventDatabase` above it uses the
+same guard style).
+
+### Not done in this entry (explicitly, per instruction)
+
+- No changes to `threatManager.js`, `eventExecutor.js`, `popup.js`,
+  `threatConsequences.js`, or `threatDatabase.js` — confirmed via
+  `git diff --stat`, not just belief.
+- No Threat notifications.
+- No new Threat decision logic, thresholds, probabilities, weights, or
+  cooldown logic duplicated into the UI.
+
+### Verification performed
+
+18-part Node test (via `vm`, against the real files —
+`threatDatabase.js`, `eventDatabase.js`, `threatManager.js`, and the
+modified `informationBoard.js` together). Confirmed existing Treasure
+Status/Hidden Event Status output is unchanged (regression); a fresh
+game correctly shows NORMAL/0; driving the real
+`ThreatManager.registerHarmfulEvent()` three times and re-rendering
+shows the panel correctly reflecting 3 harmful events and the real
+DANGEROUS threshold being crossed; a source-text check confirms no
+local counter exists in `informationBoard.js`, only a call to
+`getSummary()`; driving 6 harmful events and re-rendering again shows
+the panel correctly updating to CRITICAL/6, proving the display is
+live rather than cached; `git diff --stat` confirmed zero diff on all
+5 other Threat-Engine files; source-text checks confirmed no
+level/probability/weight/cooldown logic was duplicated into the UI.
+
+**Could not verify:** actual browser rendering/visual layout — this
+was a Node-level test confirming the generated HTML string's content,
+not a rendered-browser or visual confirmation.
+
+### Next unfinished step
+
+Threat notifications (level-change/punishment events via
+`NotificationManager`), when instructed.

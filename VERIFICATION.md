@@ -1030,6 +1030,64 @@ a running browser.
 
 ---
 
+## VERIFIED — Threat Engine, Step 7: Information Board Threat display (informationBoard.js)
+
+**Verified against commit:** `b56cf2b`
+
+**Systems/files involved:** `js/managers/informationBoard.js` only
+(23 additive lines — a `threatSummary` lookup plus two new
+`<p class="infoBoardLine">` lines and one new `<h3>` in the existing
+template literal). No new HTML/CSS — reuses `#infoBoard`/`.infoBoardLine`/
+`<h3>` exactly as the existing Treasure/Hidden Event sections already
+do. `threatManager.js`, `eventExecutor.js`, `popup.js`,
+`threatConsequences.js`, `threatDatabase.js` all confirmed zero diff.
+
+**What was tested (18-part Node test against the real files, run
+through `vm` — `threatDatabase.js`, `eventDatabase.js`,
+`threatManager.js`, and the modified `informationBoard.js` loaded
+together):**
+- Existing functionality preserved: Treasure Status and Hidden Event
+  Status sections still render correctly with the same counts as
+  before (regression).
+- Fresh/reset game (`ThreatManager.initialize()`): confirmed "Threat
+  Level: NORMAL" and "Harmful Events Resolved: 0" both render
+  correctly.
+- Drove the real `ThreatManager.registerHarmfulEvent()` three times
+  (via its actual public API, not a stub), re-rendered, and confirmed
+  the panel shows "Harmful Events Resolved: 3" and "Threat Level:
+  DANGEROUS" (3 harmful events crosses that real threshold) — proving
+  the display reads live `ThreatManager` state, not a fabricated or
+  hardcoded value.
+- Source-text check confirming `informationBoard.js` contains no local
+  increment/assignment resembling a harmful-event counter of its own,
+  and does call `ThreatManager.getSummary()` — the single source of
+  truth.
+- Drove 6 harmful events and re-called `render()` a second time on the
+  same board object: confirmed the panel updates from NORMAL/0 to
+  CRITICAL/6, proving the display is live on every render call, not
+  cached or stale.
+- `git diff --stat` confirmed zero diff on all 5 other Threat-Engine
+  files.
+- Source-text checks confirming `informationBoard.js` never references
+  `ThreatLevels`/`ThreatPunishments`/`punishmentChance`/`.weight`
+  (no decision logic duplicated) and never reads/writes cooldown state
+  (`playerCooldowns`/`getCooldown(`/`isOnCooldown(`) — the display
+  shows only what `getSummary()` deliberately exposes.
+
+**Would require rerun if:** `ThreatManager.getSummary()`'s return
+shape changes, or `InformationBoard.render()`'s template structure
+changes.
+
+**Known, intentionally deferred (not a defect):** Threat notifications
+(level-change/punishment events via `NotificationManager`) still don't
+exist.
+
+**Could not verify:** actual browser rendering/visual layout — this
+was a Node-level test confirming the generated HTML string contains
+the correct text, not a rendered-browser or visual confirmation.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

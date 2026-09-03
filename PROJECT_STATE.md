@@ -1,7 +1,7 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `3c7985c` — "Threat Engine: Step 6
-CORRECTION — overlapping-Pass concurrency/state-leak fix (`popup.js`)"
+**Last updated against commit:** `b56cf2b` — "Threat Engine: Step 7 —
+Information Board Threat display (`informationBoard.js`)"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -183,9 +183,20 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
     immediately, before touching `passesRemaining` or the swap at all,
     so only one swap/restore cycle can ever be active. Scoped to
     `pass()` only, not the shared `_resolveTile()`.
-  - NOT DONE YET: `informationBoard.js` (show current Threat Level +
-    hidden-event count, no location hints), `notificationManager.js`
-    calls for level-change/punishment events.
+  - DONE: **Information Board Threat display.**
+    `InformationBoard.render()` now shows a "Threat Status" section —
+    current Threat Level and Harmful Events Resolved — sourced
+    entirely from `ThreatManager.getSummary()` (the public API Step 2
+    built explicitly for this purpose). No level/count tracking exists
+    in `informationBoard.js` itself; a stale/duplicated read is
+    structurally impossible since the panel is rebuilt from
+    `getSummary()` on every `render()` call, the same way Hidden Event
+    Status is rebuilt from `GameNight.board` on every call. Reuses the
+    existing `.infoBoardLine`/`<h3>` markup pattern — no new HTML/CSS
+    was added. `threatManager.js` untouched; only its existing public
+    API is consumed.
+  - NOT DONE YET: `notificationManager.js` calls for level-change/
+    punishment events.
 
 ## Systems: prepared but intentionally NOT implemented (architecture only)
 
@@ -231,7 +242,7 @@ See BACKLOG.md for the full list of approved-but-not-started features.
 
 Threat Engine — data layer, `ThreatManager`, `ThreatConsequences`, the
 harmful-event registration/punishment chain, per-game initialization/
-reset, and now Pass correctly skipping the punishment roll are all
-live in real gameplay. Still not implemented: Information Board
-Threat display, Threat notifications. Next step: one of those two,
-whichever is instructed next.
+reset, Pass correctly skipping the punishment roll, and now the
+Information Board's Threat status display are all live in real
+gameplay. Still not implemented: Threat notifications. Next step:
+Threat notifications, when instructed.

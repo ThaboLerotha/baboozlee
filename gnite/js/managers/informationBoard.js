@@ -20,6 +20,11 @@ if they exist. Neither is set by anything yet -- the Treasure Chest
 system itself is deferred (see DEVLOG). This just defines the display
 contract a future system can write into, without fabricating chest
 state that doesn't exist.
+
+Threat Status (Step 7) reads ThreatManager.getSummary() -- level and
+harmfulEventsResolved come entirely from ThreatManager's own state,
+never tracked here. Deliberately excludes cooldowns and anything that
+could hint at hidden event locations.
 */
 
 const InformationBoard = {
@@ -62,6 +67,18 @@ const InformationBoard = {
 
         const legacyChestStatus = GameNight.legacyChestStatus || "Not Created";
 
+        // Reads ThreatManager's own public summary API (built for
+        // exactly this purpose -- see its own comment in
+        // threatManager.js) rather than tracking level/count here.
+        // Deliberately excludes cooldowns and anything that could hint
+        // at hidden event locations, same as the Hidden Event Status
+        // section above only shows counts, never positions.
+        const threatSummary = (typeof ThreatManager !== "undefined")
+
+            ? ThreatManager.getSummary()
+
+            : { level: "NORMAL", harmfulEventsResolved: 0 };
+
         panel.innerHTML = `
 
 <h2>Information Board</h2>
@@ -79,6 +96,12 @@ const InformationBoard = {
 <p class="infoBoardLine">Harmful Events Remaining: ${counts.Harmful}</p>
 
 <p class="infoBoardLine">Neutral Events Remaining: ${counts.Neutral}</p>
+
+<h3>Threat Status</h3>
+
+<p class="infoBoardLine">Threat Level: ${threatSummary.level}</p>
+
+<p class="infoBoardLine">Harmful Events Resolved: ${threatSummary.harmfulEventsResolved}</p>
 
 `;
 
