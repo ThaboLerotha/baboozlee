@@ -1,7 +1,7 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `c6b4226` — "Threat Engine:
-Pass skips the punishment roll (`popup.js`) — step 6 of N"
+**Last updated against commit:** `3c7985c` — "Threat Engine: Step 6
+CORRECTION — overlapping-Pass concurrency/state-leak fix (`popup.js`)"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -152,22 +152,37 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
     sites mirror the existing pattern every other per-game manager
     already follows at the same two call sites (`ContractManager`,
     `HistoryManager`, `Timer`, `GameEndManager` itself).
-  - DONE: **Pass correctly skips the punishment roll.**
-    `Popup.pass()` still fully resolves the harmful event via the same
-    shared `_resolveTile()` helper `correct()`/`wrong()` use — the
-    tile's event still fires, its normal outcome is still recorded,
-    nothing about the underlying game event changes. What's different:
-    for the single `_resolveTile()` call `pass()` makes,
-    `ThreatManager.registerHarmfulEvent` is temporarily swapped for a
-    no-op (always restored in `finally`, even if resolution throws) —
-    every Harmful handler inside `EventExecutor` still calls it
-    exactly as it always does (the existing API is fully reused,
+  - DONE: **Pass correctly skips the punishment roll**, and this has
+    since been **hardened against overlapping/concurrent Pass calls**
+    (Step 6 correction). `Popup.pass()` still fully resolves the
+    harmful event via the same shared `_resolveTile()` helper
+    `correct()`/`wrong()` use — the tile's event still fires, its
+    normal outcome is still recorded, nothing about the underlying
+    game event changes. For the single `_resolveTile()` call `pass()`
+    makes, `ThreatManager.registerHarmfulEvent` is temporarily swapped
+    for a no-op (always restored in `finally`, even if resolution
+    throws) — every Harmful handler inside `EventExecutor` still calls
+    it exactly as it always does (the existing API is fully reused,
     completely unmodified), it just resolves to "no punishment" while
     a Pass is in flight. Net effect: zero Threat Level change, zero
     harmful-event-counter change, zero cooldown change, zero Shield
     interaction, zero `ThreatConsequences.apply()` call — for that one
-    resolution only. `eventExecutor.js` has zero diff from this step;
-    the swap lives entirely in `popup.js`.
+    resolution only. `eventExecutor.js` has zero diff from either the
+    original step or the correction; the swap lives entirely in
+    `popup.js`. **Correction:** tracing confirmed nothing in `ui.js`
+    disables the Pass button while a resolution is in flight, and
+    `_resolveTile()` genuinely yields at real await points (a targeted
+    event's `promptTarget()`, then a deliberate double
+    `requestAnimationFrame`) — so a second `pass()` call arriving
+    during that window could have swapped
+    `ThreatManager.registerHarmfulEvent` a second time, with whichever
+    call's `finally` ran first restoring the OTHER call's in-flight
+    no-op instead of the real function, permanently disabling Threat
+    registration. `Popup._passInProgress` now guards `pass()`'s entire
+    body — a second call arriving while one is already active returns
+    immediately, before touching `passesRemaining` or the swap at all,
+    so only one swap/restore cycle can ever be active. Scoped to
+    `pass()` only, not the shared `_resolveTile()`.
   - NOT DONE YET: `informationBoard.js` (show current Threat Level +
     hidden-event count, no location hints), `notificationManager.js`
     calls for level-change/punishment events.

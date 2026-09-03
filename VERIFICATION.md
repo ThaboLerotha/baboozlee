@@ -913,6 +913,123 @@ test against the real files, not a rendered-browser test.
 
 ---
 
+## VERIFIED — Threat Engine, Step 6 CORRECTION: overlapping-Pass concurrency/state-leak fix (popup.js)
+
+**Verified against commit:** `3c7985c`
+
+**This is a correction/hardening of Step 6's existing implementation,
+not a new Threat feature.** No new Threat decision logic, levels,
+punishments, probabilities, weights, or cooldown rules were added.
+
+**Systems/files involved:** `js/ui/popup.js` only (32 additive lines —
+a `_passInProgress` guard flag plus one early-return check at the top
+of `pass()`). `eventExecutor.js` confirmed zero diff — the fix did not
+require touching it; `threatManager.js`, `threatConsequences.js`,
+`threatDatabase.js`, `ui.js`, `gameEndManager.js`,
+`informationBoard.js`, `notificationManager.js`, `contractManager.js`
+all confirmed zero diff too.
+
+**The bug (confirmed by tracing, not assumed):** nothing in `ui.js`
+disables the Pass button while a resolution is in flight — its click
+handler just calls `Popup.pass()` directly, unconditionally, every
+click. `_resolveTile()` genuinely yields at real await points (a
+targeted harmful event's `promptTarget()`, then a deliberate double
+`requestAnimationFrame`), so a second `pass()` call arriving during
+that window would have started a second swap of the same shared
+`ThreatManager.registerHarmfulEvent` reference. Whichever call's
+`finally` ran first would restore the OTHER call's in-flight no-op
+instead of the real function — permanently disabling Threat
+registration for the rest of the game after any accidental Pass
+double-click.
+
+**The fix:** a `_passInProgress` boolean on `Popup`, checked at the
+very top of `pass()` before anything else runs. A second `pass()`
+call arriving while one is already active returns immediately —
+before touching `passesRemaining`, before touching
+`ThreatManager.registerHarmfulEvent` at all. This makes overlapping
+swap cycles structurally impossible (only one can ever be active), and
+incidentally also fixes the more general "double-click Pass = double
+tile resolution" bug the same race would have caused independent of
+the Threat Engine. Scoped to `pass()` only, not the shared
+`_resolveTile()` other actions (`correct`/`wrong`/`continueEvent`)
+use — their own concurrency was out of scope for this correction.
+
+**Why `eventExecutor.js` was not touched:** the Popup-level guard
+fully and provably eliminates the race at its root (no overlapping
+`pass()` execution is possible at all), so no signal needs to cross
+into `eventExecutor.js` beyond what Step 6 already established. This
+was a genuine architectural choice, not an attempt to preserve a
+zero-diff metric for its own sake — the guard is simpler, self-
+contained, and fixes a broader latent issue than a `eventExecutor.js`
+change would have.
+
+**What was tested (38-part Node test against the real files, run
+through `vm` — `threatDatabase.js`, `contractDatabase.js`,
+`contractManager.js`, `threatManager.js`, `threatConsequences.js`,
+`eventExecutor.js`, and the corrected `popup.js` loaded together):**
+
+*New overlapping-Pass regression (the correction's primary target):*
+- Used a real targeted Harmful event (`BOMB_OTHER`) with a
+  `TargetSelector.open(eligible, resolve, promptText)` stub that
+  deliberately withholds calling `resolve` — creating a genuine
+  suspension inside the real `bombOther()`'s `await this.promptTarget(...)`,
+  itself inside the real `EventExecutor.execute()`, itself inside the
+  real `_resolveTile()`, itself inside the real `pass()`'s `try` block.
+  This is a real overlap window produced by actual production code
+  paths, not a simulated/reimplemented race.
+- Confirmed Pass #1 is genuinely suspended mid-resolution before
+  attempting Pass #2 (drained the microtask queue first).
+- Confirmed the swap was already active and `passesRemaining` already
+  decremented at that point (proving genuine overlap, not two
+  sequential completed calls).
+- Started Pass #2 while Pass #1 was still suspended: confirmed
+  `passesRemaining` was NOT decremented a second time.
+- Let Pass #1 complete: confirmed neither overlapping call ever
+  triggered `registerHarmfulEvent` (0 calls total), confirmed
+  `passesRemaining` decremented exactly once total across both calls,
+  confirmed `ThreatManager.registerHarmfulEvent` is genuinely restored
+  to the real function afterward (called it directly and confirmed it
+  still increments the counter), and confirmed `Popup._passInProgress`
+  correctly resets to `false`.
+- Confirmed a subsequent, separate, normal harmful-event resolution
+  (`wrong()` on a different tile) still calls the real
+  `registerHarmfulEvent` exactly once and still produces a real
+  `ThreatConsequences.apply()` call — the guard doesn't leave anything
+  disabled afterward.
+- Confirmed a later, non-overlapping Pass call still works normally
+  after an earlier (separate) test's overlap was handled — no
+  permanent lockout from the guard flag itself.
+
+*Existing Step 6 tests, re-run against the corrected file (all
+originally-passing behavior confirmed still passing):* Pass never
+calls `registerHarmfulEvent`/`ThreatConsequences.apply`, no Level/
+counter/cooldown/Shield change, the real function is restored
+correctly, existing Pass behavior (passesRemaining, no points, History
+label, tile resolution) unchanged; a normal `wrong()` on the same
+setup still produces real Threat behavior; passing a Beneficial event
+still applies its own effect; two purely *sequential* (non-overlapping)
+Pass turns still produce zero leaked state; a forced mid-resolution
+exception during Pass still propagates, still restores the real
+function, AND now also still correctly resets `_passInProgress`
+(a new assertion added to this pre-existing test, since the guard flag
+needed the same crash-safety the swap already had); `git diff --stat`
+confirmed zero diff on all 9 other Threat-adjacent files; source-text
+check confirmed no decision logic duplicated into `popup.js`.
+
+**Would require rerun if:** `pass()`'s guard/swap logic changes again,
+`_resolveTile()`'s await structure changes in a way that changes where
+genuine suspension points occur, or `ThreatManager.registerHarmfulEvent`'s
+name/signature changes.
+
+**Could not verify:** actual browser/UI double-click behavior (no
+visual or real-browser confirmation was performed or is claimed) —
+this was Node-level verification against the real files, using a
+controlled/simulated overlap window (via a stubbed `TargetSelector.open`
+that withholds `resolve`) rather than a literal double mouse-click in
+a running browser.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

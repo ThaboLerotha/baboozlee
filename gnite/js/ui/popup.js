@@ -589,7 +589,35 @@ ${infoBlock}
     // unmodified), it simply resolves to "no punishment" while a Pass
     // is in flight. Always restored in `finally`, so a mid-resolution
     // error can never leave the Threat Engine permanently disabled.
+    //
+    // Step 6 correction: nothing in ui.js disables the Pass button
+    // while a resolution is in flight (checked -- no such guard exists
+    // anywhere), and _resolveTile() genuinely yields at real await
+    // points (a targeted event's promptTarget(), then a deliberate
+    // double requestAnimationFrame). A second pass() invocation
+    // arriving during that window would swap
+    // ThreatManager.registerHarmfulEvent a second time, and whichever
+    // call's `finally` runs first would restore the OTHER call's
+    // in-flight no-op instead of the real function, permanently
+    // disabling Threat registration for the rest of the game. This
+    // guard makes that impossible: a second pass() call arriving while
+    // one is already in flight returns immediately, before touching
+    // passesRemaining or the swap at all, so only one swap/restore
+    // cycle can ever be active at a time. This also incidentally fixes
+    // the same double-resolution risk (double passesRemaining
+    // deduction, double tile resolution) the race would otherwise
+    // cause independent of the Threat Engine -- but the fix is scoped
+    // to pass() only, not the shared _resolveTile() other actions use,
+    // since only Pass's concurrency was in scope for this correction.
+    _passInProgress: false,
+
     async pass() {
+
+        if(this._passInProgress){
+
+            return;
+
+        }
 
         const current = Players.getCurrentPlayer();
 
@@ -598,6 +626,8 @@ ${infoBlock}
             return;
 
         }
+
+        this._passInProgress = true;
 
         current.passesRemaining -= 1;
 
@@ -628,6 +658,8 @@ ${infoBlock}
                 ThreatManager.registerHarmfulEvent = originalRegisterHarmfulEvent;
 
             }
+
+            this._passInProgress = false;
 
         }
 

@@ -2089,3 +2089,76 @@ confirmation was performed or is claimed.
 
 One of: Information Board Threat display, or Threat notifications.
 Whichever is instructed next.
+
+## Entry 22 — Threat Engine: Step 6 CORRECTION (overlapping-Pass concurrency/state-leak fix)
+
+**This is a correction/hardening of Entry 21's Step 6 implementation,
+not a new Threat feature.**
+
+### What changed
+
+An independent review of commit `913572a` identified a real
+concurrency risk in Step 6's swap-based implementation: `Popup.pass()`
+temporarily replaces the global `ThreatManager.registerHarmfulEvent`
+reference and holds that replacement active across an `await`ed
+`_resolveTile()` call. Tracing confirmed the risk was genuine, not
+theoretical — nothing in `ui.js` disables the Pass button while a
+resolution is in flight (its click handler calls `Popup.pass()`
+unconditionally, every click), and `_resolveTile()` genuinely yields
+at real await points (a targeted harmful event's `promptTarget()`,
+then a deliberate double `requestAnimationFrame`). A second `pass()`
+call arriving during that window would start a second swap on the
+same shared reference; whichever call's `finally` ran first would
+restore the OTHER call's in-flight no-op instead of the real function
+— permanently disabling Threat registration for the rest of the game.
+
+Fix: `Popup._passInProgress`, checked at the very top of `pass()`
+before anything else runs. A second call arriving while one is
+already active returns immediately, before touching `passesRemaining`
+or the swap at all — making overlapping swap cycles structurally
+impossible, since only one can ever be active. This also incidentally
+fixes the more general "double-click Pass = double tile resolution"
+bug the same race would have caused independent of the Threat Engine,
+though the fix is deliberately scoped to `pass()` only, not the shared
+`_resolveTile()` other actions use (their own concurrency was out of
+scope for this correction).
+
+`eventExecutor.js` was **not** touched. The Popup-level guard fully
+eliminates the race at its root without needing any new signal to
+cross into `eventExecutor.js` — a genuine architectural choice (the
+guard is simpler and fixes a broader issue), not an attempt to force a
+zero-diff outcome for its own sake.
+
+### Verification performed
+
+38-part Node test (via `vm`, against the real files). The new
+overlapping-Pass regression test used a real targeted Harmful event
+(`BOMB_OTHER`) with a `TargetSelector.open` stub that deliberately
+withholds calling `resolve`, creating a genuine suspension inside the
+real `bombOther()` → `EventExecutor.execute()` → `_resolveTile()` →
+`pass()` call chain — not a simulated race. Confirmed Pass #1
+genuinely suspends mid-resolution with the swap already active and
+`passesRemaining` already decremented; confirmed Pass #2, started
+during that window, doesn't touch `passesRemaining` again; confirmed
+after Pass #1 completes that neither call ever triggered
+`registerHarmfulEvent`, `passesRemaining` moved exactly once total,
+the real function is genuinely restored (called directly and
+confirmed it still increments), and `_passInProgress` resets to
+`false`; confirmed a subsequent separate normal harmful-event
+resolution still works correctly end-to-end; confirmed a later
+non-overlapping Pass still works normally (no permanent lockout from
+the guard). All of Step 6's original tests were re-run against the
+corrected file and still pass, with one new assertion added to the
+existing mid-resolution-exception test confirming `_passInProgress`
+also resets correctly on error. `git diff --stat` confirmed zero diff
+on all 9 other Threat-adjacent files.
+
+**Could not verify:** actual browser/UI double-click behavior — this
+was Node-level verification using a controlled/simulated overlap
+window (a stubbed `TargetSelector.open` withholding `resolve`), not a
+literal double mouse-click in a running browser.
+
+### Next unfinished step
+
+One of: Information Board Threat display, or Threat notifications.
+Whichever is instructed next.
