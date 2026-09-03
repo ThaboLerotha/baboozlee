@@ -1,7 +1,7 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `b56cf2b` — "Threat Engine: Step 7 —
-Information Board Threat display (`informationBoard.js`)"
+**Last updated against commit:** `5dc79cc` — "Threat Engine: Step 8 —
+Threat notifications (`eventExecutor.js`)"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -195,8 +195,33 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
     existing `.infoBoardLine`/`<h3>` markup pattern — no new HTML/CSS
     was added. `threatManager.js` untouched; only its existing public
     API is consumed.
-  - NOT DONE YET: `notificationManager.js` calls for level-change/
-    punishment events.
+  - DONE: **Threat notifications.** `EventExecutor.registerThreatHarm()`
+    (the same orchestration hub that already forwards to
+    `ThreatConsequences`) now also calls `NotificationManager.notify()`
+    at exactly two points: a "⚠️ Threat Level Rising" notification the
+    moment `result.level` (from `ThreatManager.registerHarmfulEvent()`)
+    differs from the level captured immediately before that call — a
+    before/after comparison, not a re-derivation of threshold rules —
+    and a "☠️ Threat Punishment" notification only when
+    `ThreatConsequences.apply()` itself reports `applied: true` (so a
+    punishment `ThreatManager` selected but that got blocked by Shield
+    inside `ThreatConsequences` never notifies). The punishment
+    message reuses each punishment's existing `description` field from
+    `threatDatabase.js` rather than hardcoding text. Neither
+    `ThreatManager` nor `ThreatConsequences` calls `NotificationManager`
+    themselves — both remain exactly as decision-only/apply-only as
+    before; `eventExecutor.js` is the sole caller, matching the
+    existing `"success"|"failure"|"info"` type vocabulary and
+    emoji-title convention every other `NotificationManager.notify()`
+    call site already uses. One subtlety worth remembering: the guard
+    checks `result.level` is truthy before comparing, specifically
+    because Pass's temporary no-op stub (from Step 6, in `popup.js`)
+    returns `{ punished: false, reason: "pass" }` with no `level`
+    field at all — without that guard, every Pass would have fired a
+    false level-increase notification. `threatManager.js`,
+    `threatConsequences.js`, `threatDatabase.js`, `popup.js`,
+    `informationBoard.js`, `contractManager.js`, `gameEndManager.js`,
+    `ui.js` — all confirmed zero diff from this step.
 
 ## Systems: prepared but intentionally NOT implemented (architecture only)
 
@@ -242,7 +267,9 @@ See BACKLOG.md for the full list of approved-but-not-started features.
 
 Threat Engine — data layer, `ThreatManager`, `ThreatConsequences`, the
 harmful-event registration/punishment chain, per-game initialization/
-reset, Pass correctly skipping the punishment roll, and now the
-Information Board's Threat status display are all live in real
-gameplay. Still not implemented: Threat notifications. Next step:
-Threat notifications, when instructed.
+reset, Pass correctly skipping the punishment roll, the Information
+Board's Threat status display, and now Threat notifications
+(level-increase and punishment) are all live in real gameplay. No
+further Threat Engine work is currently queued — next steps are
+whatever is instructed (e.g. Treasure Chests, Player Departure,
+Malicious Contracts per BACKLOG.md).

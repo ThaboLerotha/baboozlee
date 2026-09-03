@@ -2222,3 +2222,95 @@ not a rendered-browser or visual confirmation.
 
 Threat notifications (level-change/punishment events via
 `NotificationManager`), when instructed.
+
+## Entry 24 — Threat Engine: Step 8 (Threat notifications)
+
+### What changed
+
+`js/managers/eventExecutor.js` only. `registerThreatHarm()` — the same
+orchestration hub that already forwards to `ThreatConsequences` — now
+also calls `NotificationManager.notify()` at two points, both purely
+by observing results that `ThreatManager`/`ThreatConsequences` already
+computed:
+
+- **Level-increase**: captures `ThreatManager.getCurrentLevelKey()`
+  immediately before calling `registerHarmfulEvent()`, then compares
+  against `result.level` (the level immediately after). A before/after
+  read, not a re-derivation of the threshold rules that produced the
+  change. Fires "⚠️ Threat Level Rising" with the new level, type
+  `"info"`.
+- **Punishment**: only fires "☠️ Threat Punishment" if
+  `ThreatConsequences.apply()` itself reports `applied: true` — a
+  punishment `ThreatManager` selected but that `ThreatConsequences`
+  then blocked (e.g. absorbed by Shield) correctly never notifies,
+  since it never actually happened. Reuses each punishment's existing
+  `description` field from `threatDatabase.js` for the message text
+  rather than hardcoding anything, and the actual target player's
+  name via `GameNight.players.find()`. Type `"failure"`.
+
+Both calls use the existing `NotificationManager.notify(title,
+description, type)` signature and the `"success"|"failure"|"info"`
+vocabulary + emoji-title convention every other call site in the
+codebase already follows (`Contract Completed`/`Failed`, `Shield
+Broken`, `Sudden Death`) — confirmed by reading every existing call
+site before writing any code, not assumed.
+
+Neither `ThreatManager` nor `ThreatConsequences` was modified, and
+neither calls `NotificationManager` themselves — both stay exactly as
+decision-only/apply-only as every prior step left them.
+
+A real bug surfaced during testing, before anything shipped: the
+initial level-increase check (`result.level !== levelBefore`) fired a
+false positive on every Pass, because Pass's temporary no-op stub
+(Step 6, entirely inside `popup.js`) returns `{ punished: false,
+reason: "pass" }` with no `level` field at all — `undefined !==
+"NORMAL"` is `true`. Fixed by requiring `result.level` to be truthy
+before comparing, entirely within `eventExecutor.js`; no change to
+`popup.js` was needed or made.
+
+### Not done in this entry (explicitly, per instruction)
+
+- No changes to `threatManager.js`, `threatConsequences.js`,
+  `threatDatabase.js`, `popup.js`, `informationBoard.js`,
+  `contractManager.js`, `gameEndManager.js`, or `ui.js` — confirmed via
+  `git diff --stat`, not just belief.
+- No new Threat thresholds, probabilities, weights, or cooldown logic
+  — confirmed via source-text checks on both the new code and
+  `notificationManager.js`.
+- No second notification system — `NotificationManager.notify()` is
+  the only call made.
+
+### Verification performed
+
+28-part Node test (via `vm`, against the real files). Covered: no
+notification while NORMAL; exactly one level-increase notification at
+each of the DANGEROUS (3rd harmful event) and CRITICAL (6th) thresholds,
+none in between, mentioning the correct level text; a missed
+punishment roll producing zero notifications; a successful punishment
+producing exactly one, using the real punishment's actual description
+text; the Shield-blocked-punishment edge case explicitly named in the
+task (`ThreatManager` selects `POINT_DRAIN`, `ThreatConsequences`
+blocks it via Shield, confirmed zero notification); Pass producing
+zero notifications under forced-guaranteed-punish conditions (the bug
+described above, caught and fixed before commit); Information Board's
+Threat display still reading correct state; harmful-event registration
+and `BOMB_SELF`'s own unrelated point-loss both unchanged (regression);
+source-text checks confirming no decision logic exists in
+`notificationManager.js` and no `NotificationManager` reference exists
+in `threatManager.js`/`threatConsequences.js`; an end-to-end
+already-CRITICAL-plus-guaranteed-punishment scenario confirming exactly
+one notification fires, not duplicated across both checks in a single
+call; `git diff --stat` confirming zero diff on all 8 other
+Threat-adjacent files.
+
+**Could not verify:** actual browser rendering of the notification
+cards (animation, visual stacking) — Node-level verification only,
+confirming `notify()` is called correctly, not a rendered-browser
+confirmation.
+
+### Next unfinished step
+
+None queued specifically for the Threat Engine — Steps 1 through 8 are
+all complete and integrated into real gameplay. Future work (Treasure
+Chests, Player Departure, Malicious Contracts) remains in BACKLOG.md,
+approved for later but not to be started without explicit instruction.

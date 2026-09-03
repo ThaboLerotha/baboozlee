@@ -1088,6 +1088,95 @@ the correct text, not a rendered-browser or visual confirmation.
 
 ---
 
+## VERIFIED — Threat Engine, Step 8: Threat notifications (eventExecutor.js)
+
+**Verified against commit:** `5dc79cc`
+
+**Systems/files involved:** `js/managers/eventExecutor.js` only (62
+additive lines in `registerThreatHarm()`). `threatManager.js`,
+`threatConsequences.js`, `threatDatabase.js`, `popup.js`,
+`informationBoard.js`, `contractManager.js`, `gameEndManager.js`,
+`ui.js` all confirmed zero diff via individual `git diff --stat`
+checks.
+
+**Integration point and reasoning:** `EventExecutor.registerThreatHarm()`
+— the same orchestration hub Step 4 built that already sees both
+`ThreatManager`'s and `ThreatConsequences`' actual results without
+being either of them. Notifications are fired purely by observing
+already-computed results (a before/after level comparison via
+`ThreatManager.getCurrentLevelKey()`, and `ThreatConsequences.apply()`'s
+own `applied` flag) — no threshold, probability, weight, or cooldown
+logic was re-derived or duplicated anywhere.
+
+**What was tested (28-part Node test against the real files, run
+through `vm` — `threatDatabase.js`, `eventDatabase.js`,
+`contractDatabase.js`, `contractManager.js`, `threatManager.js`,
+`threatConsequences.js`, the modified `eventExecutor.js`,
+`informationBoard.js`, and `popup.js` loaded together):**
+- A single harmful event while Threat stays NORMAL: zero Threat
+  notifications.
+- Driving harmful events one at a time: confirmed zero level
+  notifications after 2 (below the 3-event DANGEROUS threshold), then
+  exactly one level-increase notification on the 3rd (mentioning
+  DANGEROUS specifically).
+- Continuing to 5 events: still exactly one level notification total;
+  on the 6th (CRITICAL threshold), exactly one NEW level-increase
+  notification (mentioning CRITICAL), two total — no duplicates at
+  either transition.
+- A forced-miss punishment roll (37%/70% chance, guaranteed-fail
+  random): zero punishment notifications.
+- A forced-hit punishment roll: exactly one punishment notification,
+  its text containing the actual selected punishment's real
+  `description` field from `threatDatabase.js` (not a hardcoded
+  string), with the underlying Shield removal confirmed as a
+  regression check.
+- **The Shield-blocked-punishment edge case explicitly named in the
+  task:** forced `ThreatManager` to select `POINT_DRAIN` specifically
+  (a Shield-protectable punishment, not `SHIELD_BREAK`) against a
+  shielded player — confirmed the punishment was genuinely blocked
+  inside `ThreatConsequences` (no additional point loss beyond the
+  harmful event's own unrelated effect, Shield consumed) and confirmed
+  **zero** punishment notification fired, since `ThreatManager`
+  selected it but `ThreatConsequences.apply()` never reported
+  `applied: true`.
+- Pass, under forced-guaranteed-punish conditions: zero Threat
+  notifications of any kind — this test caught a real bug during
+  development (the level-increase check initially fired a false
+  positive on Pass, since Pass's no-op stub returns a result object
+  with no `level` field at all; fixed with an explicit truthy-guard
+  before ever shipping).
+- Confirmed `InformationBoard`'s Threat display still reads correct
+  state via `ThreatManager.getSummary()` (regression).
+- Confirmed harmful-event registration/counting and `BOMB_SELF`'s own
+  unrelated point-loss behavior are both unchanged (regression).
+- Source-text checks confirming `notificationManager.js` contains no
+  Threat-specific decision logic, and that `threatManager.js`/
+  `threatConsequences.js` contain no `NotificationManager` reference
+  at all — neither decision-maker nor applier calls into notifications
+  themselves.
+- An end-to-end CRITICAL-plus-guaranteed-punishment scenario (level
+  already CRITICAL before the call, so no level notification is
+  expected) confirmed exactly one notification total (the punishment
+  one) — no duplicate firing when both a level check and a punishment
+  check run in the same `registerThreatHarm()` call.
+- `git diff --stat` confirmed zero diff on all 8 other Threat-adjacent
+  files.
+
+**Would require rerun if:** `ThreatManager.registerHarmfulEvent()`'s
+return shape changes, `ThreatConsequences.apply()`'s `applied` field
+semantics change, `threatDatabase.js`'s punishment `description` field
+changes, or the Pass stub's return shape changes (which the
+`result.level` truthy-guard depends on staying "no `level` field",
+not "a specific value").
+
+**Could not verify:** actual browser rendering of the notification
+cards (fade-in/fade-out animation, visual stacking) — this was
+Node-level verification confirming `NotificationManager.notify()` is
+called with correct title/description/type at correct times, not a
+rendered-browser or visual confirmation.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

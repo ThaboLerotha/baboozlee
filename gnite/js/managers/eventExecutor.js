@@ -218,6 +218,27 @@ const EventExecutor = {
     // Threat Level, cooldowns, or punishment weights -- those stay
     // entirely owned by ThreatManager/ThreatConsequences. Guarded the
     // same way every other optional-manager call in this codebase is.
+    //
+    // Step 8: this is also the one place that fires Threat
+    // notifications, for the same reason it's the one place that
+    // forwards to ThreatConsequences -- it's the orchestration point
+    // that sees both systems' actual results, without being either of
+    // them. Neither ThreatManager nor ThreatConsequences calls
+    // NotificationManager themselves; this only ever reports what they
+    // already decided/did, never recalculates anything:
+    //   - Level-increase: compares the level immediately before this
+    //     call to result.level (the level immediately after) via
+    //     ThreatManager's own getCurrentLevelKey()/registerHarmfulEvent()
+    //     -- a before/after read, not a re-derivation of the threshold
+    //     rules that produced it. Guarded on result.level being present
+    //     at all, since Pass's temporary no-op stub (popup.js) returns
+    //     a result with no `level` field -- this guard is what keeps
+    //     Pass from ever firing a false level-increase notification,
+    //     with zero changes needed to popup.js itself.
+    //   - Punishment: only fires if ThreatConsequences.apply() itself
+    //     reports applied:true -- a punishment ThreatManager selected
+    //     but that ThreatConsequences then blocked (e.g. absorbed by
+    //     Shield) never notifies, since it never actually happened.
     registerThreatHarm(playerId){
 
         if(typeof ThreatManager === "undefined"){
@@ -226,11 +247,51 @@ const EventExecutor = {
 
         }
 
+        const levelBefore = ThreatManager.getCurrentLevelKey();
+
         const result = ThreatManager.registerHarmfulEvent(playerId);
+
+        if(result && result.level && result.level !== levelBefore && typeof NotificationManager !== "undefined"){
+
+            NotificationManager.notify(
+
+                "⚠️ Threat Level Rising",
+
+                `The Threat Level has risen to ${result.level}.`,
+
+                "info"
+
+            );
+
+        }
 
         if(result && result.punished && typeof ThreatConsequences !== "undefined"){
 
-            ThreatConsequences.apply(playerId, result.punishment);
+            const consequence = ThreatConsequences.apply(playerId, result.punishment);
+
+            if(consequence && consequence.applied && typeof NotificationManager !== "undefined"){
+
+                const player = GameNight.players.find(p => p.id === playerId);
+
+                const punishmentDef = (typeof ThreatPunishments !== "undefined")
+
+                    ? ThreatPunishments.find(p => p.key === consequence.punishment)
+
+                    : null;
+
+                const description = punishmentDef ? punishmentDef.description : consequence.punishment;
+
+                NotificationManager.notify(
+
+                    "☠️ Threat Punishment",
+
+                    `${player ? player.name : "A player"}: ${description}`,
+
+                    "failure"
+
+                );
+
+            }
 
         }
 
