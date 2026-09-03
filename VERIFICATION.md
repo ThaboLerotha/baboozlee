@@ -818,6 +818,101 @@ yet; no Threat notifications exist yet.
 
 ---
 
+## VERIFIED — Threat Engine, Step 6: Pass skips the punishment roll (popup.js)
+
+**Verified against commit:** `c6b4226`
+
+**Systems/files involved:** `js/ui/popup.js` only — `pass()` modified
+(44 additive lines net). `eventExecutor.js` confirmed zero diff via
+`git diff --stat` (checked, not assumed) — no outcome parameter or
+flag was added there; `threatManager.js`, `threatConsequences.js`,
+`threatDatabase.js`, `ui.js`, `gameEndManager.js`,
+`informationBoard.js`, `notificationManager.js`, `contractManager.js`
+all confirmed zero diff too.
+
+**Semantic finding (traced from real code, not assumed):** `Popup.pass()`
+calls the exact same shared `_resolveTile()` helper as `correct()`/
+`wrong()`, with `awardPoints=false, outcome="pass"` — the tile's own
+existing comment states explicitly that "the tile is still consumed
+and its event (if any) still fires." `EventExecutor.execute(event, tile)`
+has no `outcome` parameter at all, so nothing inside any Harmful
+handler could previously distinguish a Pass resolution from a Wrong
+one. This confirms interpretation B (event resolves; player escapes
+the punishment roll specifically), and that closing the gap correctly
+requires *some* signal to cross from `popup.js` into the Threat
+registration path for that one resolution.
+
+**How it's implemented:** rather than threading a new parameter
+through `execute()` and its 11 `registerThreatHarm` call sites (which
+would have required editing `eventExecutor.js`), `pass()` temporarily
+replaces the live `ThreatManager.registerHarmfulEvent` function
+reference with a no-op returning `{ punished: false, reason: "pass" }`,
+only for the duration of its own `_resolveTile()` call, inside a
+`try`/`finally` that unconditionally restores the original — including
+if `_resolveTile()` throws. `EventExecutor`'s `registerThreatHarm()`
+still calls `ThreatManager.registerHarmfulEvent(playerId)` exactly as
+written; it has no idea anything is different. This keeps
+`eventExecutor.js` at zero diff while fully reusing the existing
+Threat Engine API (no decision logic duplicated).
+
+**What was tested (28-part Node test against the real files, run
+through `vm` — `threatDatabase.js`, `contractDatabase.js`,
+`contractManager.js`, `threatManager.js`, `threatConsequences.js`,
+`eventExecutor.js`, and the modified `popup.js` all loaded together):**
+- Passing a harmful event with `ThreatManager` forced into DANGEROUS
+  and the roll forced to guarantee a hit if it ran: confirmed
+  `registerHarmfulEvent` is never called, `ThreatConsequences.apply`
+  is never called, Threat Level unchanged, harmful-event counter
+  unchanged, cooldown unchanged (`getCooldown` stayed 0), and the
+  player's Shield untouched.
+- Confirmed `ThreatManager.registerHarmfulEvent` is genuinely restored
+  to the real function afterward (called it directly post-Pass and
+  confirmed the counter actually incremented).
+- Confirmed existing Pass behavior is completely unchanged:
+  `passesRemaining` still decrements, no points awarded (`"Answered
+  Correctly"` never recorded, `"Pass Used"` is), tile still resolves
+  through to `Score.update()`/turn advance (regression).
+- Same tile, same forced-punish setup, but via `wrong()` instead of
+  `pass()`: confirmed `registerHarmfulEvent` still fires exactly once
+  and `ThreatConsequences.apply` still fires — proving the swap is
+  correctly scoped to the Pass call only and doesn't leak into or
+  suppress the normal path.
+- Passing a Beneficial event (`DOUBLE_POINTS`): confirmed
+  `registerHarmfulEvent` still isn't called (matches existing
+  behavior — Beneficial events were never wired to the Threat Engine
+  in Step 4) and the event's own effect (`doublePoints = true`) still
+  applies despite Pass — Pass only changes points/History label, never
+  the event itself (regression).
+- Two sequential Pass turns on two different harmful tiles: zero
+  `registerHarmfulEvent` calls total across both, confirming no
+  leaked/stuck stub state between resolutions.
+- Forced `_resolveTile()` to throw mid-resolution during a Pass:
+  confirmed the exception still propagates (not silently swallowed)
+  AND `ThreatManager.registerHarmfulEvent` is still correctly restored
+  to the real function afterward — the `finally` guarantee holds even
+  on failure.
+- Individual `git diff --stat` checks confirming zero diff on all 9
+  other Threat-Engine-adjacent files listed above.
+- Source-text checks confirming `popup.js` contains no
+  `ThreatLevels`/`ThreatPunishments`/`punishmentChance`/`.weight`
+  reference (no decision logic duplicated) and no new Threat-Level/
+  Information-Board/Notification-shaped additions.
+
+**Would require rerun if:** `_resolveTile()`'s shared resolution
+sequence changes, `pass()`'s own logic changes, or
+`ThreatManager.registerHarmfulEvent`'s name/signature changes (which
+would break the swap silently rather than loudly — worth flagging as
+a fragility this technique has that a formal parameter wouldn't).
+
+**Known, intentionally deferred (not a defect):** Information Board
+doesn't show Threat Level yet; no Threat notifications exist yet.
+
+**Could not verify:** actual browser/UI behavior (no visual
+confirmation was performed or is claimed) — this was a Node-level
+test against the real files, not a rendered-browser test.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

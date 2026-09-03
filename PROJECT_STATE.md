@@ -1,10 +1,7 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `12d1088` — "Threat Engine:
-initialize/reset lifecycle wiring (`ui.js`, `gameEndManager.js`) —
-step 5 of N" (note: the previous header here read `2642da8`, one
-amend-generation stale versus the actual commit that landed on
-`origin/main`, `c77dbb3` — corrected while already editing this line)
+**Last updated against commit:** `c6b4226` — "Threat Engine:
+Pass skips the punishment roll (`popup.js`) — step 6 of N"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -155,10 +152,25 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
     sites mirror the existing pattern every other per-game manager
     already follows at the same two call sites (`ContractManager`,
     `HistoryManager`, `Timer`, `GameEndManager` itself).
-  - NOT DONE YET: Pass skipping the roll (`popup.js`),
-    `informationBoard.js` (show current Threat Level + hidden-event
-    count, no location hints), `notificationManager.js` calls for
-    level-change/punishment events.
+  - DONE: **Pass correctly skips the punishment roll.**
+    `Popup.pass()` still fully resolves the harmful event via the same
+    shared `_resolveTile()` helper `correct()`/`wrong()` use — the
+    tile's event still fires, its normal outcome is still recorded,
+    nothing about the underlying game event changes. What's different:
+    for the single `_resolveTile()` call `pass()` makes,
+    `ThreatManager.registerHarmfulEvent` is temporarily swapped for a
+    no-op (always restored in `finally`, even if resolution throws) —
+    every Harmful handler inside `EventExecutor` still calls it
+    exactly as it always does (the existing API is fully reused,
+    completely unmodified), it just resolves to "no punishment" while
+    a Pass is in flight. Net effect: zero Threat Level change, zero
+    harmful-event-counter change, zero cooldown change, zero Shield
+    interaction, zero `ThreatConsequences.apply()` call — for that one
+    resolution only. `eventExecutor.js` has zero diff from this step;
+    the swap lives entirely in `popup.js`.
+  - NOT DONE YET: `informationBoard.js` (show current Threat Level +
+    hidden-event count, no location hints), `notificationManager.js`
+    calls for level-change/punishment events.
 
 ## Systems: prepared but intentionally NOT implemented (architecture only)
 
@@ -203,8 +215,8 @@ See BACKLOG.md for the full list of approved-but-not-started features.
 ## Currently being developed
 
 Threat Engine — data layer, `ThreatManager`, `ThreatConsequences`, the
-harmful-event registration/punishment chain, and now per-game
-initialization/reset are all live in real gameplay. Still not
-implemented: Pass skipping the punishment roll, Information Board
-Threat display, Threat notifications. Next step: one of those three,
+harmful-event registration/punishment chain, per-game initialization/
+reset, and now Pass correctly skipping the punishment roll are all
+live in real gameplay. Still not implemented: Information Board
+Threat display, Threat notifications. Next step: one of those two,
 whichever is instructed next.

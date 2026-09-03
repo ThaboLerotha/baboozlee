@@ -2009,3 +2009,83 @@ Confirmed via individual `git diff --stat` checks that
 One of: Pass skipping the punishment roll (`popup.js`), Information
 Board Threat display, or Threat notifications. Whichever is
 instructed next.
+
+## Entry 21 — Threat Engine: Step 6 (Pass skips the punishment roll)
+
+### What changed
+
+Traced the real Pass flow before writing anything. `Popup.pass()`
+calls the exact same shared `_resolveTile()` helper as `correct()`/
+`wrong()` (`awardPoints=false, outcome="pass"`) — the tile's own
+existing comment already says the tile's event "still fires" on Pass.
+`EventExecutor.execute(event, tile)` has no `outcome` parameter at
+all, so no Harmful handler could ever have told a Pass apart from a
+Wrong resolution. This settles the semantic question explicitly posed
+for this step: the harmful event **resolves** on Pass (game effects
+unchanged), the player specifically escapes the **punishment roll**.
+
+Closing that gap without threading a new parameter through
+`execute()` and its 11 `registerThreatHarm()` call sites (which would
+have meant modifying `eventExecutor.js`) turned out to have a
+`popup.js`-only solution: `pass()` now temporarily replaces the live
+`ThreatManager.registerHarmfulEvent` function reference with a no-op
+returning `{ punished: false, reason: "pass" }`, only for the
+duration of its own `_resolveTile()` call, inside a `try`/`finally`
+that unconditionally restores the original function — including when
+`_resolveTile()` throws. `EventExecutor.registerThreatHarm()` still
+calls `ThreatManager.registerHarmfulEvent(playerId)` exactly as
+written, with no knowledge anything is different; the existing Threat
+Engine API is fully reused, not duplicated or modified.
+
+An earlier draft of this change added a `skipThreatRegistration` flag
+and one guard line inside `eventExecutor.js`'s existing
+`registerThreatHarm()` helper — a genuinely working, minimal approach.
+It was reverted in favor of the swap-based version above once it
+became clear the task's own final-check list demanded confirming zero
+diff on `eventExecutor.js`, which the swap achieves outright rather
+than needing to be argued as an acceptable exception.
+
+### Not done in this entry (explicitly, per instruction)
+
+- No changes to `threatManager.js`, `threatConsequences.js`,
+  `threatDatabase.js`, `eventExecutor.js`, `ui.js`,
+  `gameEndManager.js`, `informationBoard.js`, `notificationManager.js`,
+  or `contractManager.js` — confirmed via individual `git diff --stat`
+  checks, not just belief.
+- No new Threat levels, punishments, probabilities, weights, or
+  cooldown rules.
+- No Threat UI, no Threat notifications, no Information Board changes.
+
+### Verification performed
+
+28-part Node test (via `vm`, against the real files — `threatDatabase.js`,
+`contractDatabase.js`, `contractManager.js`, `threatManager.js`,
+`threatConsequences.js`, `eventExecutor.js`, and the modified
+`popup.js` loaded together, spying on the real `ThreatManager`/
+`ThreatConsequences` methods rather than reimplementing them):
+Passing a harmful event with punishment forced-guaranteed produces
+zero `registerHarmfulEvent` calls, zero `ThreatConsequences.apply`
+calls, and zero change to Level/harmful-counter/cooldown/Shield; the
+real function is confirmed genuinely restored afterward (called it
+directly and confirmed it still increments); a same-setup `wrong()`
+call on the same tile still produces the normal Threat behavior
+(proving the swap doesn't leak into or suppress the non-Pass path);
+existing Pass behavior (passesRemaining decrement, no points, correct
+History entry, tile resolution) confirmed unchanged; passing a
+Beneficial event still applies its own effect and still makes zero
+Threat calls either way; two sequential Pass turns produce zero leaked
+state between them; a forced mid-resolution exception during Pass
+still propagates AND still leaves the real function correctly
+restored, proving the `finally` guarantee holds under failure; and
+`git diff --stat` confirmed zero diff on all 9 other Threat-Engine-
+adjacent files, with source-text checks confirming no decision logic
+was duplicated into `popup.js`.
+
+**Could not verify:** actual browser/UI behavior — this was a
+Node-level test against the real files, no rendered-browser
+confirmation was performed or is claimed.
+
+### Next unfinished step
+
+One of: Information Board Threat display, or Threat notifications.
+Whichever is instructed next.

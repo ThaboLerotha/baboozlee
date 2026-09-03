@@ -572,6 +572,23 @@ ${infoBlock}
     // event (if any) still fires -- the only difference from wrong() is
     // the passesRemaining deduction. Guarded against passesRemaining
     // being 0, though the button is already hidden in that case.
+    //
+    // Threat Engine (Step 6): the harmful event itself still fully
+    // resolves via _resolveTile() below, exactly as it does for
+    // wrong() -- Pass does not undo it, and its normal outcome is
+    // still recorded (see _resolveTile's own "pass" branch). What Pass
+    // changes is specifically that the Threat punishment roll must not
+    // happen for this one resolution. EventExecutor.execute() has no
+    // `outcome` parameter, and _resolveTile() is shared by
+    // correct/wrong/pass/continueEvent, so neither can be taught "this
+    // is a Pass" without a change reaching outside this file. Instead,
+    // ThreatManager.registerHarmfulEvent is temporarily pointed at a
+    // no-op for the single _resolveTile() call below -- every Harmful
+    // handler inside EventExecutor still calls it exactly as it always
+    // does (the existing Threat Engine API is fully reused, completely
+    // unmodified), it simply resolves to "no punishment" while a Pass
+    // is in flight. Always restored in `finally`, so a mid-resolution
+    // error can never leave the Threat Engine permanently disabled.
     async pass() {
 
         const current = Players.getCurrentPlayer();
@@ -586,7 +603,33 @@ ${infoBlock}
 
         Score.update();
 
-        await this._resolveTile(false, "pass");
+        let originalRegisterHarmfulEvent = null;
+
+        if(typeof ThreatManager !== "undefined"){
+
+            originalRegisterHarmfulEvent = ThreatManager.registerHarmfulEvent;
+
+            ThreatManager.registerHarmfulEvent = function(){
+
+                return { punished: false, reason: "pass" };
+
+            };
+
+        }
+
+        try {
+
+            await this._resolveTile(false, "pass");
+
+        } finally {
+
+            if(originalRegisterHarmfulEvent){
+
+                ThreatManager.registerHarmfulEvent = originalRegisterHarmfulEvent;
+
+            }
+
+        }
 
     }
 
