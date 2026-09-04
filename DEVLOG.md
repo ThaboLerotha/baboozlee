@@ -2391,3 +2391,76 @@ Whatever Player Departure Step 2 turns out to be (likely: deciding how
 `GameNight.currentPlayer` is handled when the removed player is at or
 before the current index) — not to be started without explicit
 instruction, per this step's scope.
+
+## Entry 26 — Player Departure: Step 2 (currentPlayer index fixup)
+
+### What changed
+
+Searched the whole codebase for every use of `GameNight.currentPlayer`/
+`getCurrentPlayer()`/turn advancement before writing anything —
+confirmed `score.js`'s `nextPlayer()` is the existing convention for
+how this index is meant to behave (increment, wrap to `0` at
+`length`), and that `GameNight.currentPlayer` is read/written in
+exactly four other places (`ui.js`, `players.js`'s own
+`createPlayers()`, `gameEndManager.js`'s `newGameWithSamePlayers()`,
+and `score.js`), none of which needed to change for this step.
+
+Updated `Players.removePlayer(playerId)` (same method Step 1 added,
+no new method) to keep `GameNight.currentPlayer` structurally valid
+after the `splice`:
+- Removed index before the current index → decrement the current
+  index by one, so it still points at the same actual player (every
+  index from the current player onward shifted down by one).
+- Removed index after the current index → leave it untouched (that
+  player's own position in the array didn't move).
+- Removed index equal to the current index (the current player left)
+  → leave the index numerically the same, since whoever was next now
+  occupies that exact slot — *unless* it was also the last index
+  (nothing shifted into it), in which case clamp to
+  `Math.max(0, GameNight.players.length - 1)`. This is a clamp, not
+  `score.js`'s wrap-to-`0` turn-advancement behavior — a departure
+  isn't a turn ending, so wrapping back to the first player would be
+  the wrong semantics here.
+- Invalid/nonexistent id → unchanged from Step 1, returns before
+  touching `GameNight.currentPlayer` at all.
+
+Removing the last remaining player leaves the list empty and
+`GameNight.currentPlayer` at `0` — `getCurrentPlayer()` then returns
+`undefined` without throwing, the same behavior an out-of-range index
+has always had (`GameNight.players[0]` on an empty array), not a new
+special case added for this.
+
+### Not done in this entry (explicitly, per instruction)
+
+- No departure UI/button, no confirmation dialog.
+- No notifications, no `HistoryManager` integration.
+- No Treasure Chest / Reward Chest / Legacy Chest work.
+- No turn-rotation *rules* for departures (this is purely keeping the
+  existing index-based pointer valid, not deciding new turn-order
+  behavior).
+- No game-ending rules, no reconnection, no special event protection.
+- No new `DepartureManager`, no second player list.
+- No changes to unrelated systems — confirmed via `git diff --name-only`.
+
+### Verification performed
+
+27-part Node test against the real `players.js`. Covered all five
+required cases plus one extra: removing before/after/at the current
+index (both the ordinary and last-index sub-cases), removing the only
+remaining player, an additional case removing the current player down
+to exactly one survivor, and an invalid id — every case confirmed
+`GameNight.currentPlayer` ends up both in-bounds and pointing at the
+semantically correct player (or safely `0` on an empty list), with
+`getCurrentPlayer()` never throwing. `createPlayers()`/`getCurrentPlayer()`
+regression-checked unchanged. Source-text checks scoped to
+`removePlayer`'s own function body confirmed no chest/UI/History/
+notification/game-ending code was introduced, and no
+`DepartureManager` exists anywhere in the file. `git diff --name-only`
+confirmed exactly one file changed in the entire working tree.
+
+**Could not verify:** nothing browser/UI-related applies to this step.
+
+### Next unfinished step
+
+Whatever Player Departure Step 3 turns out to be — not to be started
+without explicit instruction, per this step's scope.

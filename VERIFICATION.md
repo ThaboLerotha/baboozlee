@@ -1239,6 +1239,73 @@ is no UI in this step to verify.
 
 ---
 
+## VERIFIED — Player Departure, Step 2: currentPlayer index fixup (js/game/players.js)
+
+**Verified against commit:** `b2f1545`
+
+**Systems/files involved:** `js/game/players.js` only (41 net
+additive lines inside the existing `removePlayer` method — no new
+method, no other file touched or read from in a new way).
+
+**Behavior implemented:** `GameNight.currentPlayer` (a array index —
+confirmed by re-reading `score.js`'s `nextPlayer()`, the existing
+turn-advancement code, which uses the same increment/wrap-at-length
+convention) is now kept structurally valid across a removal:
+- removed index `<` current index → decrement current index (same
+  actual player stays current).
+- removed index `>` current index → current index untouched.
+- removed index `===` current index → left numerically the same
+  (whoever was next now occupies that slot) unless it was the last
+  index, in which case clamp to `max(0, newLength - 1)`.
+- Invalid/nonexistent id → early return before touching
+  `GameNight.currentPlayer` at all.
+
+**What was tested (27-part Node test against the real file):**
+- Removing before the current index: index decrements, `getCurrentPlayer()`
+  still resolves to the exact same actual player object as before.
+- Removing after the current index: index unchanged, same actual
+  player still current.
+- Removing the current player (not at the last index): index stays
+  numerically the same, now correctly resolving to whoever was next in
+  order; confirmed within valid bounds.
+- Removing the current player who IS at the last index: clamps to the
+  new last index, confirmed not out of bounds and resolving to a real
+  player (not `undefined`).
+- Removing the only remaining player (a 1-player list): no throw, the
+  removed player is correctly returned, the list is empty afterward,
+  `GameNight.currentPlayer` clamps to a safe `0` (not negative), and
+  `getCurrentPlayer()` returns `undefined` without throwing — the same
+  safe behavior an out-of-range index has always had, not a new
+  special case.
+- An additional case beyond the minimum requested: removing the
+  current player down to exactly one remaining player, confirming the
+  clamp lands correctly on index `0`.
+- Invalid player id: returns `null`, `GameNight.currentPlayer` and the
+  full player list both completely untouched.
+- `createPlayers()` and `getCurrentPlayer()` regression-checked and
+  confirmed unchanged.
+- Source-text checks scoped to `removePlayer`'s own function body: no
+  chest-status assignment, no DOM/UI code, no `HistoryManager`/
+  `NotificationManager` reference, no `GameEndManager` reference, no
+  `DepartureManager` anywhere in the file.
+- `git diff --name-only` confirmed exactly one file in the entire
+  working tree was modified.
+
+**Would require rerun if:** `removePlayer`'s index-adjustment logic
+changes, or the turn-advancement convention in `score.js` changes in a
+way that redefines what a "valid" `GameNight.currentPlayer` value
+means.
+
+**Known, still-deferred (not a defect, per this step's explicit
+scope):** nothing calls `removePlayer()` yet — no UI, no History
+recording, no Legacy Chest creation, no game-ending checks triggered
+by a departure.
+
+**Could not verify:** nothing browser/UI-related applies here — there
+is no UI in this step to verify.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

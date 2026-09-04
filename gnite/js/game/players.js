@@ -102,12 +102,10 @@ const Players = {
 
     },
 
-    // Player Departure, Step 1: the removal primitive only -- nothing
-    // yet calls this. Deliberately does NOT touch GameNight.currentPlayer
-    // (turn rotation / current-player replacement is a separate later
-    // step), does NOT check remaining player count or end the game,
-    // and does NOT record history or create any Treasure Chest --
-    // those all read/act on the *result* of a removal, which is a
+    // Player Departure, Step 1: the removal primitive. Nothing yet
+    // calls this. Does NOT check remaining player count or end the
+    // game, and does NOT record history or create any Treasure Chest
+    // -- those all read/act on the *result* of a removal, which is a
     // decision for whichever future step actually wires this in.
     //
     // Uses `id`, the same identifier every other manager already looks
@@ -119,6 +117,26 @@ const Players = {
     // GameNight.players is mutated directly (via splice, so the
     // remaining players keep their existing relative order) -- there
     // is no second/duplicate player list anywhere to keep in sync.
+    //
+    // Player Departure, Step 2: GameNight.currentPlayer is an array
+    // *index*, not a player id (see score.js's nextPlayer(), the
+    // existing turn-advancement code, which increments/wraps it the
+    // same way). Removing an element shifts every later index down by
+    // one, so the index needs the same adjustment here or it would
+    // silently point at the wrong player (or go out of bounds) the
+    // moment anything actually calls this during a real game:
+    //   - removed player was BEFORE the current index -> everyone from
+    //     the current player onward shifted down by one, so decrement
+    //     to keep pointing at the same actual player.
+    //   - removed player was AFTER the current index -> current
+    //     player's own position is untouched, leave it alone.
+    //   - removed player WAS the current player -> the player who was
+    //     next now occupies this same index, so leave the index alone
+    //     UNLESS it was also the last index (nothing shifted into it),
+    //     in which case clamp to the new last index, floored at 0 for
+    //     an empty list. This never wraps to 0 the way normal turn
+    //     advancement does in score.js -- a departure isn't a turn
+    //     ending, it's a clamp to stay in range.
     removePlayer(playerId) {
 
         const index = GameNight.players.findIndex(
@@ -133,7 +151,23 @@ const Players = {
 
         }
 
-        return GameNight.players.splice(index, 1)[0];
+        const removed = GameNight.players.splice(index, 1)[0];
+
+        if(index < GameNight.currentPlayer){
+
+            GameNight.currentPlayer -= 1;
+
+        } else if(index === GameNight.currentPlayer){
+
+            if(GameNight.currentPlayer >= GameNight.players.length){
+
+                GameNight.currentPlayer = Math.max(0, GameNight.players.length - 1);
+
+            }
+
+        }
+
+        return removed;
 
     }
 

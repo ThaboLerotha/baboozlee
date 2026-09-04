@@ -1,7 +1,7 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `ac61d3a` — "Player Departure Step 1
-— removal primitive (`js/game/players.js`)"
+**Last updated against commit:** `b2f1545` — "Player Departure Step 2
+— currentPlayer index fixup (`js/game/players.js`)"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -225,8 +225,8 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
 
 ## Systems: in progress — Player Departure
 
-- DONE: `Players.removePlayer(playerId)` (`js/game/players.js`) — the
-  removal primitive only. Finds the player by `id` (the same
+- DONE (Step 1): `Players.removePlayer(playerId)` (`js/game/players.js`)
+  — the removal primitive. Finds the player by `id` (the same
   identifier every other manager already looks players up by —
   `GameNight.players.find(p => p.id === ...)` appears throughout
   `historyManager.js`/`contractManager.js`/`threatManager.js`/
@@ -234,18 +234,24 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
   `GameNight.players` via `splice` (preserving the remaining players'
   relative order, no duplicate list created anywhere), and returns the
   removed player object (or `null` for an invalid/nonexistent id — no
-  throw). Nothing calls this yet.
-  Deliberately does NOT touch `GameNight.currentPlayer`, doesn't check
-  remaining player count, doesn't end the game, doesn't record
-  History, doesn't create a Legacy Chest, and has no UI — all
-  explicitly separate future steps. `GameNight.currentPlayer` is an
-  *array index* (not a player id), so removing a player from the
-  middle of the array will shift indices for everyone after them; this
-  step deliberately leaves that unresolved for whichever future step
-  wires the primitive into real gameplay to handle.
-- NOT STARTED: departure UI/button, confirmation dialog, turn-rotation/
-  current-player-index fixup after a removal, game-ending checks
-  triggered by departure, History recording of a departure, Legacy
+  throw).
+- DONE (Step 2): the same method now also keeps `GameNight.currentPlayer`
+  (an array *index*, not a player id — same convention `score.js`'s
+  `nextPlayer()` already uses) structurally valid across a removal:
+  removing someone *before* the current index decrements it (same
+  actual player stays current); removing someone *after* it leaves it
+  untouched; removing the *current player themselves* leaves the index
+  numerically the same (whoever was next now occupies that slot)
+  *unless* they were at the last index, in which case it clamps to
+  `max(0, newLength - 1)` — a clamp, not score.js's wrap-to-0 turn-
+  advancement behavior, since a departure isn't a turn ending. Removing
+  the last remaining player leaves `GameNight.currentPlayer` at a safe
+  `0` on an empty list (`getCurrentPlayer()` then returns `undefined`
+  without throwing, same as it always has for an out-of-range index).
+  Nothing calls `removePlayer()` yet — still no UI, no History
+  recording, no chest creation, no game-ending checks.
+- NOT STARTED: departure UI/button, confirmation dialog, game-ending
+  checks triggered by departure, History recording of a departure, Legacy
   Chest creation (see Treasure Chests below — the two features are
   linked but neither is built).
 
@@ -296,7 +302,8 @@ Board's Threat status display, and Threat notifications
 (level-increase and punishment) are all live in real gameplay. No
 further Threat Engine work is currently queued.
 
-Player Departure — just started. `Players.removePlayer(playerId)`
-exists (the removal primitive), but nothing calls it yet — no UI, no
-turn-rotation handling, no chest creation, no history recording. See
-the dedicated section below.
+Player Departure — in progress. `Players.removePlayer(playerId)`
+exists and now also keeps `GameNight.currentPlayer` structurally
+valid across a removal, but nothing calls it yet — no UI, no History
+recording, no chest creation, no game-ending checks. See the
+dedicated section below.
