@@ -1177,6 +1177,68 @@ rendered-browser or visual confirmation.
 
 ---
 
+## VERIFIED — Player Departure, Step 1: removal primitive (js/game/players.js)
+
+**Verified against commit:** `ac61d3a`
+
+**Systems/files involved:** `js/game/players.js` only (35 additive
+lines — `removePlayer(playerId)`). No other file touched or read from
+in a new way.
+
+**Why `Players` is the correct owner:** it already owns
+`GameNight.players` creation (`createPlayers()`) and lookup
+(`getCurrentPlayer()`) and is the sole manager that mutates that
+array; no other manager touches `GameNight.players` structurally
+anywhere in the codebase (confirmed by a full-codebase search before
+writing any code). No existing removal method existed to reuse.
+
+**What was tested (20-part Node test against the real file):**
+- A valid player can be removed; confirmed absent from
+  `GameNight.players` afterward, list length correctly decremented.
+- Remaining players keep their existing relative order after removing
+  from the middle, the first position, and the last position (three
+  separate cases).
+- Removing a nonexistent id (999), an empty player list, and
+  `undefined`/`null` ids all return `null` / do nothing, without
+  throwing.
+- Three sequential removals on a 5-player list leave no duplicate ids
+  and the exact correct two survivors in the exact correct order;
+  every remaining player object's fields are still structurally
+  intact (not corrupted by the splice).
+- `createPlayers()` still works exactly as before (regression) —
+  names, default-name fallback for blank inputs, sequential `id`
+  assignment, and `GameNight.currentPlayer` reset to 0 all unchanged.
+- `getCurrentPlayer()` still correctly resolves to the same actual
+  remaining player after removing someone else from the list
+  (regression).
+- Source-text checks scoped specifically to `removePlayer`'s own
+  function body (not the whole file, since the explanatory comment
+  above it legitimately mentions Treasure Chest/History/turn-rotation
+  to explain what it deliberately does NOT do): no chest-status
+  assignment, no DOM manipulation/confirmation dialog, no reference to
+  `GameNight.currentPlayer` or `GameEndManager`, no reference to
+  `HistoryManager`/`NotificationManager`.
+- `git diff --name-only` confirmed exactly one file in the entire
+  working tree was modified.
+
+**Would require rerun if:** `removePlayer`'s logic changes, or
+anything begins actually calling it (a later step, which would need
+its own new verification for whatever it adds — turn-rotation,
+History recording, chest creation, etc.).
+
+**Known limitation, explicitly out of scope for this step (not a
+defect):** `GameNight.currentPlayer` is an array index, not a player
+id. Removing a player positioned before the current index will shift
+the current index onto the wrong player once something actually calls
+`removePlayer` during a real game — this step deliberately does not
+address that, per instruction, and it remains for whichever future
+step wires the primitive into real gameplay.
+
+**Could not verify:** nothing browser/UI-related applies here — there
+is no UI in this step to verify.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

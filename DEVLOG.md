@@ -2314,3 +2314,80 @@ None queued specifically for the Threat Engine — Steps 1 through 8 are
 all complete and integrated into real gameplay. Future work (Treasure
 Chests, Player Departure, Malicious Contracts) remains in BACKLOG.md,
 approved for later but not to be started without explicit instruction.
+
+## Entry 25 — Player Departure: Step 1 (removal primitive)
+
+### What changed
+
+Started Player Departure, a separate feature from the Threat Engine.
+Searched the whole codebase for every place that creates/reads the
+player list, identifies the current player, advances turns, checks
+player count, ends a game, renders the scoreboard, or records history,
+before writing anything — confirmed `Players` (`js/game/players.js`)
+is the sole manager that structurally mutates `GameNight.players`
+(everything else only reads it, mostly via `GameNight.players.find(p
+=> p.id === ...)`), and that no removal method existed anywhere to
+reuse.
+
+Added `Players.removePlayer(playerId)`:
+- Finds the player by `id` — the identifier convention every other
+  manager already uses to look players up
+  (`historyManager.js`/`contractManager.js`/`threatManager.js`/
+  `threatConsequences.js`/`eventExecutor.js` all do
+  `GameNight.players.find(p => p.id === ...)`), not array position.
+- Removes via `GameNight.players.splice(index, 1)`, mutating the
+  single source of truth directly — no second/duplicate player list
+  anywhere, remaining players keep their existing relative order for
+  free (that's what `splice` does).
+- Returns the removed player object, or `null` for an invalid/
+  nonexistent id, never throws.
+- Deliberately does nothing else: doesn't touch
+  `GameNight.currentPlayer`, doesn't check remaining player count,
+  doesn't end the game, doesn't record History, doesn't create a
+  Legacy Chest, has no UI. Nothing calls this method yet.
+
+Noted (but explicitly not solved, per instruction) a real
+architectural fact for whichever future step wires this in:
+`GameNight.currentPlayer` is an array *index*, not a player id, so a
+removal from before the current index will shift it onto the wrong
+player once this is actually called during a real game.
+
+### Not done in this entry (explicitly, per instruction)
+
+- No departure UI/button, no confirmation dialog.
+- No Treasure Chest / Reward Chest / Legacy Chest creation or merging.
+- No turn-rotation or current-player-index fixup after a removal.
+- No automatic current-player replacement.
+- No game-ending rules caused by departure.
+- No notifications.
+- No special event protection for departed players.
+- No reconnection.
+- No history/departure recording.
+- No new manager created (`Players` is the existing, correct owner);
+  no second player list.
+
+### Verification performed
+
+20-part Node test against the real `players.js`. Covered: valid
+removal and absence afterward; order preservation removing from the
+middle, first, and last positions; safe no-op behavior for a
+nonexistent id, an empty list, and `undefined`/`null` — none throw;
+three sequential removals on a 5-player list produce exactly the
+correct two survivors with no duplicates and structurally intact
+player objects; `createPlayers()` and `getCurrentPlayer()` both still
+work exactly as before (regression); source-text checks scoped to
+`removePlayer`'s own function body confirming no Treasure Chest
+assignment, no DOM/UI code, no `GameNight.currentPlayer`/
+`GameEndManager` reference, and no `HistoryManager`/
+`NotificationManager` reference; `git diff --name-only` confirmed
+exactly one file changed in the entire working tree.
+
+**Could not verify:** nothing browser/UI-related applies to this step
+— there is no UI to verify yet.
+
+### Next unfinished step
+
+Whatever Player Departure Step 2 turns out to be (likely: deciding how
+`GameNight.currentPlayer` is handled when the removed player is at or
+before the current index) — not to be started without explicit
+instruction, per this step's scope.

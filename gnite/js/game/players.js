@@ -100,6 +100,41 @@ const Players = {
 
         return GameNight.players[GameNight.currentPlayer];
 
+    },
+
+    // Player Departure, Step 1: the removal primitive only -- nothing
+    // yet calls this. Deliberately does NOT touch GameNight.currentPlayer
+    // (turn rotation / current-player replacement is a separate later
+    // step), does NOT check remaining player count or end the game,
+    // and does NOT record history or create any Treasure Chest --
+    // those all read/act on the *result* of a removal, which is a
+    // decision for whichever future step actually wires this in.
+    //
+    // Uses `id`, the same identifier every other manager already looks
+    // players up by (GameNight.players.find(p => p.id === ...) appears
+    // throughout historyManager.js/contractManager.js/threatManager.js/
+    // threatConsequences.js/eventExecutor.js) -- not array position,
+    // which would be unstable across removals anyway.
+    //
+    // GameNight.players is mutated directly (via splice, so the
+    // remaining players keep their existing relative order) -- there
+    // is no second/duplicate player list anywhere to keep in sync.
+    removePlayer(playerId) {
+
+        const index = GameNight.players.findIndex(
+
+            p => p.id === playerId
+
+        );
+
+        if(index === -1){
+
+            return null;
+
+        }
+
+        return GameNight.players.splice(index, 1)[0];
+
     }
 
 };

@@ -1,7 +1,7 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `5dc79cc` — "Threat Engine: Step 8 —
-Threat notifications (`eventExecutor.js`)"
+**Last updated against commit:** `ac61d3a` — "Player Departure Step 1
+— removal primitive (`js/game/players.js`)"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -223,6 +223,32 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
     `informationBoard.js`, `contractManager.js`, `gameEndManager.js`,
     `ui.js` — all confirmed zero diff from this step.
 
+## Systems: in progress — Player Departure
+
+- DONE: `Players.removePlayer(playerId)` (`js/game/players.js`) — the
+  removal primitive only. Finds the player by `id` (the same
+  identifier every other manager already looks players up by —
+  `GameNight.players.find(p => p.id === ...)` appears throughout
+  `historyManager.js`/`contractManager.js`/`threatManager.js`/
+  `threatConsequences.js`/`eventExecutor.js`), removes them from
+  `GameNight.players` via `splice` (preserving the remaining players'
+  relative order, no duplicate list created anywhere), and returns the
+  removed player object (or `null` for an invalid/nonexistent id — no
+  throw). Nothing calls this yet.
+  Deliberately does NOT touch `GameNight.currentPlayer`, doesn't check
+  remaining player count, doesn't end the game, doesn't record
+  History, doesn't create a Legacy Chest, and has no UI — all
+  explicitly separate future steps. `GameNight.currentPlayer` is an
+  *array index* (not a player id), so removing a player from the
+  middle of the array will shift indices for everyone after them; this
+  step deliberately leaves that unresolved for whichever future step
+  wires the primitive into real gameplay to handle.
+- NOT STARTED: departure UI/button, confirmation dialog, turn-rotation/
+  current-player-index fixup after a removal, game-ending checks
+  triggered by departure, History recording of a departure, Legacy
+  Chest creation (see Treasure Chests below — the two features are
+  linked but neither is built).
+
 ## Systems: prepared but intentionally NOT implemented (architecture only)
 
 - **Treasure Chests** — `GameNight.rewardChestStatus` /
@@ -233,8 +259,6 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
   Approved design: exactly two possible chests per game (default
   hidden chest from game start; a Legacy/Departure chest that only
   exists if a player leaves). Never a collection of multiple chests.
-- **Player Departure** — `HistoryManager.record()` is generic enough to
-  log a departure directly; no departure/removal logic is written.
 - **Malicious Contracts** — approved as future work. Contracts whose
   purpose can be to harm another player, even if the holder gains
   nothing. Not implemented. The Threat Engine's `ContractManager`
@@ -268,8 +292,11 @@ See BACKLOG.md for the full list of approved-but-not-started features.
 Threat Engine — data layer, `ThreatManager`, `ThreatConsequences`, the
 harmful-event registration/punishment chain, per-game initialization/
 reset, Pass correctly skipping the punishment roll, the Information
-Board's Threat status display, and now Threat notifications
+Board's Threat status display, and Threat notifications
 (level-increase and punishment) are all live in real gameplay. No
-further Threat Engine work is currently queued — next steps are
-whatever is instructed (e.g. Treasure Chests, Player Departure,
-Malicious Contracts per BACKLOG.md).
+further Threat Engine work is currently queued.
+
+Player Departure — just started. `Players.removePlayer(playerId)`
+exists (the removal primitive), but nothing calls it yet — no UI, no
+turn-rotation handling, no chest creation, no history recording. See
+the dedicated section below.

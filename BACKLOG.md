@@ -46,5 +46,10 @@ PROJECT_STATE.md since Thabo explicitly greenlit building it.
 ## Player Departure
 
 - Handling a player leaving mid-game.
-- `HistoryManager.record()` is generic enough to log a departure event
-  directly, but no departure/removal logic has been written.
+- Step 1 (removal primitive, `Players.removePlayer(playerId)`) is done
+  — see PROJECT_STATE.md. Still approved-for-later and not to be
+  built further without explicit instruction: departure UI, turn-
+  rotation/current-player-index handling after a removal, game-ending
+  checks triggered by departure, and History recording of a
+  departure (`HistoryManager.record()` is generic enough to log one
+  directly whenever that step happens).
