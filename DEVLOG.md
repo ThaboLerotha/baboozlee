@@ -2464,3 +2464,77 @@ confirmed exactly one file changed in the entire working tree.
 
 Whatever Player Departure Step 3 turns out to be — not to be started
 without explicit instruction, per this step's scope.
+
+## Entry 27 — Player Departure: Step 3 (departure entry point)
+
+### What changed
+
+Searched the codebase for existing player-removal/leaving/list-
+mutation/reset logic before writing anything — confirmed the only
+such logic anywhere is Steps 1–2's `Players.removePlayer()`, and
+nothing else creates or reads a second player list.
+
+Added `Players.departPlayer(playerId)` — the one seam future
+departure functionality (UI, etc.) should call, so nothing outside
+`players.js` ever needs to manipulate `GameNight.players` or call
+`removePlayer()` directly. Chose this name over inventing something
+else since it reads clearly next to the existing `removePlayer`/
+`createPlayers`/`getCurrentPlayer` naming convention and distinctly
+signals "the departure-specific entry point," distinct from the
+generic removal primitive underneath it.
+
+Deliberately thin: validates the player exists via
+`GameNight.players.find()` first, so a caller gets an explicit result
+rather than having to infer success from `removePlayer()`'s
+null-vs-object return; if the player doesn't exist, returns
+`{ success: false, reason: "invalid-player", playerId }` without
+calling `removePlayer()` at all. Otherwise delegates the entire
+mutation — and the Step 2 `currentPlayer` safeguards that come with it
+for free — to the existing `removePlayer()`, returning
+`{ success: true, player: <removed player object> }`. This result
+shape matches the codebase's existing decision/outcome-object
+convention already used by `ThreatManager.registerHarmfulEvent()` and
+`ThreatConsequences.apply()` (`{ <flag>: boolean, reason?, ...details }`),
+rather than inventing a new pattern or returning a bare boolean.
+
+### Not done in this entry (explicitly, per instruction)
+
+- No departure UI/button, no confirmation dialog.
+- No notifications, no `HistoryManager` integration.
+- No Treasure Chest / Reward Chest / Legacy Chest work.
+- No turn-rotation changes beyond what `removePlayer()` (Step 2)
+  already handles.
+- No game-ending rules, no reconnection, no special event protection.
+- No scoring changes.
+- No new `DepartureManager`, no second player list, no duplicate
+  removal implementation — confirmed via source-text check that
+  `departPlayer()`'s own body contains no `.splice(` call or
+  `GameNight.currentPlayer` assignment.
+- No changes to unrelated systems — confirmed via `git diff --name-only`.
+
+### Verification performed
+
+24-part Node test against the real `players.js`. Covered: a valid
+departure (success, correct removed player returned, confirmed
+absent afterward); an invalid id and separately `undefined`/`null`
+(no throw, clear failure result, zero state change); a spy on
+`removePlayer()` confirming `departPlayer()` calls it exactly once for
+a valid player and not at all for an invalid one (rejection happens
+before delegation); a source-text check that `departPlayer()` only
+ever references `GameNight.players`, no second list;
+`GameNight.currentPlayer`'s Step 2 safeguards (decrement-before-current
+and clamp-at-last-index) both exercised through `departPlayer()`
+specifically, not just `removePlayer()` directly; player ordering
+preserved; `createPlayers()`/`getCurrentPlayer()` regression-checked
+unchanged, including `getCurrentPlayer()` correctly resolving after
+`departPlayer()` removes the current player; source-text checks
+confirming no chest/UI/History/notification/game-ending/
+`DepartureManager` code anywhere in the file. `git diff --name-only`
+confirmed exactly one file changed in the entire working tree.
+
+**Could not verify:** nothing browser/UI-related applies to this step.
+
+### Next unfinished step
+
+Whatever Player Departure Step 4 turns out to be — not to be started
+without explicit instruction, per this step's scope.

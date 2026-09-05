@@ -169,6 +169,45 @@ const Players = {
 
         return removed;
 
+    },
+
+    // Player Departure, Step 3: the departure entry point. Nothing
+    // yet calls this either -- still no UI, no History recording, no
+    // chest creation. This exists purely as the one seam future
+    // departure functionality should call, instead of manipulating
+    // GameNight.players or calling removePlayer() directly:
+    //   UI (future) -> Players.departPlayer(playerId) -> removePlayer()
+    //
+    // Deliberately thin: validates the player exists (so callers get
+    // an explicit, clear result rather than having to infer success
+    // from removePlayer()'s null-vs-object return), then delegates the
+    // actual mutation and the Step 2 currentPlayer safeguards entirely
+    // to the existing removePlayer() -- no removal logic is
+    // duplicated here, and GameNight.players stays the only player
+    // list either way.
+    //
+    // Result shape matches this codebase's existing convention for a
+    // decision/action outcome object (see ThreatManager.registerHarmfulEvent()
+    // and ThreatConsequences.apply(), both { <flag>: boolean, reason?
+    // string, ...details }), rather than a bare boolean or throwing.
+    departPlayer(playerId) {
+
+        const player = GameNight.players.find(
+
+            p => p.id === playerId
+
+        );
+
+        if(!player){
+
+            return { success: false, reason: "invalid-player", playerId };
+
+        }
+
+        const removed = this.removePlayer(playerId);
+
+        return { success: true, player: removed };
+
     }
 
 };

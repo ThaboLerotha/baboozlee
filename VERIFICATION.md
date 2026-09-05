@@ -1306,6 +1306,69 @@ is no UI in this step to verify.
 
 ---
 
+## VERIFIED — Player Departure, Step 3: departure entry point (js/game/players.js)
+
+**Verified against commit:** `bcc5cc1`
+
+**Systems/files involved:** `js/game/players.js` only (39 additive
+lines — a new `departPlayer(playerId)` method; `removePlayer` itself
+untouched).
+
+**Entry point created:** `Players.departPlayer(playerId)` — validates
+the player exists via `GameNight.players.find()`, then delegates the
+actual mutation entirely to the existing `removePlayer(playerId)`
+(inheriting its Step 2 `currentPlayer` safeguards for free, no logic
+duplicated). Returns `{ success: false, reason: "invalid-player",
+playerId }` without ever calling `removePlayer()` if the player
+doesn't exist, or `{ success: true, player: <removed player object> }`
+on success — matching this codebase's existing decision/outcome-object
+convention (`ThreatManager.registerHarmfulEvent()`,
+`ThreatConsequences.apply()`) rather than a bare boolean.
+
+**What was tested (24-part Node test against the real file):**
+- Valid player: `success: true`, the actual removed player object
+  returned, confirmed absent from `GameNight.players` afterward.
+- Invalid/nonexistent id (999, and separately `undefined`/`null`): no
+  throw, `success: false` with `reason: "invalid-player"`, player list
+  and `currentPlayer` both completely untouched.
+- Spied on `removePlayer()` and confirmed `departPlayer()` calls it
+  exactly once for a valid player, and **not at all** for an invalid
+  one (rejected before delegation, not after) — proving
+  `removePlayer()` remains the actual removal primitive, not
+  reimplemented.
+- Source-text check confirming `departPlayer()`'s own body only
+  references `GameNight.players` (via the existence check) and never
+  a second list.
+- `GameNight.currentPlayer` correctly decrements/clamps through
+  `departPlayer()` exactly as it would through `removePlayer()`
+  directly — exercised both the before-current-index case and the
+  removed-at-last-index clamp case, both via `departPlayer()`.
+- Player ordering preserved after a `departPlayer()` call.
+- `createPlayers()` and `getCurrentPlayer()` regression-checked
+  unchanged, including `getCurrentPlayer()` correctly resolving to the
+  next player after `departPlayer()` removes the current one.
+- Source-text checks confirming no chest-status assignment, no DOM/UI
+  code, no `HistoryManager`/`NotificationManager`/`GameEndManager`
+  reference, and no `DepartureManager` anywhere in the file; also
+  confirmed `departPlayer()`'s own body contains no `.splice(` call or
+  `GameNight.currentPlayer` assignment (no duplicate removal/index
+  logic).
+- `git diff --name-only` confirmed exactly one file in the entire
+  working tree was modified.
+
+**Would require rerun if:** `departPlayer()`'s validation or
+delegation logic changes, or `removePlayer()`'s own behavior changes
+(since `departPlayer()` inherits it entirely).
+
+**Known, still-deferred (not a defect, per this step's explicit
+scope):** nothing calls `departPlayer()` yet — no UI, no History
+recording, no Legacy Chest creation, no game-ending checks.
+
+**Could not verify:** nothing browser/UI-related applies here — there
+is no UI in this step to verify.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

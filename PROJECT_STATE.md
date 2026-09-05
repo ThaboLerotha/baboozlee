@@ -1,7 +1,7 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `b2f1545` — "Player Departure Step 2
-— currentPlayer index fixup (`js/game/players.js`)"
+**Last updated against commit:** `bcc5cc1` — "Player Departure Step 3
+— departure entry point (`js/game/players.js`)"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -248,8 +248,27 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
   the last remaining player leaves `GameNight.currentPlayer` at a safe
   `0` on an empty list (`getCurrentPlayer()` then returns `undefined`
   without throwing, same as it always has for an out-of-range index).
-  Nothing calls `removePlayer()` yet — still no UI, no History
-  recording, no chest creation, no game-ending checks.
+  Nothing calls `removePlayer()` directly from outside `players.js`
+  anymore as of Step 3 below — it stays the internal primitive, called
+  only by `departPlayer()`.
+- DONE (Step 3): `Players.departPlayer(playerId)` — the actual entry
+  point future departure functionality (UI, etc.) should call, so
+  nothing outside `players.js` ever needs to manipulate
+  `GameNight.players` or call `removePlayer()` directly:
+  `departPlayer()` → `removePlayer()`. Validates the player exists
+  first (`GameNight.players.find(p => p.id === ...)`), returning
+  `{ success: false, reason: "invalid-player", playerId }` without
+  calling `removePlayer()` at all if not; otherwise delegates entirely
+  to `removePlayer()` (no removal/index logic duplicated — confirmed
+  via source-text check that `departPlayer()`'s own body contains no
+  `.splice(` or `GameNight.currentPlayer` assignment) and returns
+  `{ success: true, player: <removed player object> }`. The result
+  shape matches this codebase's existing decision/outcome-object
+  convention (`ThreatManager.registerHarmfulEvent()`,
+  `ThreatConsequences.apply()` — `{ <flag>: boolean, reason?, ...details }`)
+  rather than a bare boolean or a thrown error. Nothing calls
+  `departPlayer()` yet either — still no UI, no History recording, no
+  chest creation, no game-ending checks.
 - NOT STARTED: departure UI/button, confirmation dialog, game-ending
   checks triggered by departure, History recording of a departure, Legacy
   Chest creation (see Treasure Chests below — the two features are
@@ -303,7 +322,8 @@ Board's Threat status display, and Threat notifications
 further Threat Engine work is currently queued.
 
 Player Departure — in progress. `Players.removePlayer(playerId)`
-exists and now also keeps `GameNight.currentPlayer` structurally
-valid across a removal, but nothing calls it yet — no UI, no History
+(the primitive, index-safe as of Step 2) and `Players.departPlayer(playerId)`
+(the entry point future functionality should actually call) both
+exist, but nothing calls `departPlayer()` yet — no UI, no History
 recording, no chest creation, no game-ending checks. See the
 dedicated section below.
