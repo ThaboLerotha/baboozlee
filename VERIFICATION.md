@@ -1464,6 +1464,81 @@ is no UI in this step to verify.
 
 ---
 
+## VERIFIED — Player Departure, Step 5: minimum-player game end (players.js, gameEndManager.js)
+
+**Verified against commit:** `0620226`
+
+**Systems/files involved:** `js/game/players.js` (`departPlayer()`
+now checks the roster size after `removePlayer()` and conditionally
+calls `GameEndManager.endGame()`), `js/managers/gameEndManager.js`
+(`showEndGameWindow()` gained a guard for an `undefined` winner). No
+new manager, no duplicated game-ending logic — `endGame()` itself is
+completely unmodified.
+
+**Behavior implemented:** `departPlayer()` → cleanup → `removePlayer()`
+→ if `GameNight.players.length < 2`, call the existing
+`GameEndManager.endGame()` (the same single authority `Board` already
+triggers via `checkBoardExhausted()`). `departPlayer()` makes no
+winner/game-over decisions itself.
+
+**Real bug found and fixed before shipping:** `endGame()` with zero
+players produces `leaders[0] === undefined` (via `Math.max()` on an
+empty array), and the pre-existing `showEndGameWindow(winner)` would
+throw reading `winner.name` — a scenario structurally impossible
+before Player Departure existed. Fixed with a guard at the top of
+`showEndGameWindow()`: a falsy `winner` now renders a plain "Game
+Over — No players remain." message and returns, without touching the
+existing scoreboard/stats rendering used for every normal ending.
+
+**What was tested (17-part Node test against the real files, run
+through `vm` — `threatDatabase.js`, `contractDatabase.js`,
+`contractManager.js`, `threatManager.js`, `gameEndManager.js`, and the
+modified `players.js` loaded together):**
+- 5→4, 4→3, 3→2 departures: `GameEndManager.gameEnded` stays `false`
+  each time.
+- 2→1: `gameEnded` becomes `true`.
+- 1→0 (the genuinely fragile edge): `departPlayer()` does not throw,
+  roster is empty, `gameEnded` becomes `true`.
+- Invalid player ID: `success: false`, `gameEnded` stays `false`,
+  roster untouched.
+- Regression: the existing `checkBoardExhausted()` → `endGame()` path
+  (a normal win) and the tie → Sudden Death path both still work
+  exactly as before, completely unaffected by the new departure call
+  site.
+- `departPlayer()`'s existing Step 4 cleanup (contract cancellation,
+  Threat cooldown clearing) confirmed to still run, and to complete,
+  *before* the new game-end trigger fires in the same 2→1 call.
+- Source-text checks confirming no chest-status assignment in
+  `departPlayer()`, that it calls `GameEndManager.endGame()` by name
+  without ever setting `.gameEnded` itself or computing a winner
+  (`Math.max`), and that no `DepartureManager` or second game-ending
+  system exists anywhere.
+- Source-text check confirming the new `showEndGameWindow()` guard
+  introduces no chest/UI/notification code beyond the plain message.
+- `git diff --name-only` confirmed exactly the two expected files were
+  modified.
+
+**Would require rerun if:** `endGame()`'s winner-selection logic
+changes, `showEndGameWindow()`'s signature or guard changes, or the
+minimum-player threshold (`< 2`) changes.
+
+**Architectural limitation discovered:** the zero-player crash
+described above. Resolved within this step via the minimal guard;
+not left as an open blocker.
+
+**Known, still-deferred (not a defect, per this step's explicit
+scope):** nothing calls `departPlayer()` yet — no UI, no departure
+History entry, no Legacy Chest creation. The minimum player count
+required to *start* a new game is unchanged — this step is about
+automatic ending caused by departure only.
+
+**Could not verify:** actual browser rendering of the "Game Over — No
+players remain." message (visual layout/styling) — this was Node-level
+verification confirming `gameEnded` becomes `true` and no exception is
+thrown, not a rendered-browser confirmation.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

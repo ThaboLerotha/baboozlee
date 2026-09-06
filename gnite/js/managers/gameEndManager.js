@@ -449,6 +449,34 @@ ${q.question}
 
         }
 
+        // Player Departure: winner is undefined if the roster reached
+        // zero players (the last remaining player departed too).
+        // endGame() still calls this the same way it always has for
+        // every other case -- this guards the one thing that would
+        // otherwise read winner.name/winner.score off undefined,
+        // rather than the caller special-casing an empty roster.
+        if(!winner){
+
+            content.innerHTML = `
+
+<h2>Game Over</h2>
+
+<p>No players remain.</p>
+
+`;
+
+            const win = document.getElementById("endGameWindow");
+
+            if(win){
+
+                win.classList.remove("hidden");
+
+            }
+
+            return;
+
+        }
+
         const ranked = GameNight.players
 
             .slice()

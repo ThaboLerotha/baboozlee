@@ -2628,3 +2628,80 @@ blocker to report.
 
 Whatever Player Departure Step 5 turns out to be — not to be started
 without explicit instruction, per this step's scope.
+
+## Entry 29 — Player Departure: Step 5 (minimum-player game end)
+
+### What changed
+
+Read `gameEndManager.js`'s `endGame()`/`checkBoardExhausted()` before
+writing anything — confirmed it's the single existing authority over
+ending the game (its own file header already says so), already called
+from exactly one place (`Board`'s tile-consumption path).
+
+`Players.departPlayer()` (`players.js`) now checks
+`GameNight.players.length < 2` immediately after `removePlayer()` and,
+if true, calls `GameEndManager.endGame()` unchanged — the same
+existing mechanism, triggered from a second call site the same way it
+already has one. `departPlayer()` decides nothing about winners or
+what "the game has ended" means; `endGame()`'s own
+`if(this.gameEnded) return;` guard already makes a departure occurring
+after the game has ended harmless, so no extra guard was needed here.
+
+While implementing this, found a real, previously-latent bug before
+it could ship: `endGame()` with zero players computes
+`Math.max(...[])` → `-Infinity`, `leaders` → `[]`, and then calls
+`showEndGameWindow(leaders[0])` → `showEndGameWindow(undefined)` — the
+existing code unconditionally reads `winner.name`/`winner.score`,
+which would throw. This scenario was structurally impossible before
+Player Departure existed (no prior code path could ever bring
+`GameNight.players` to zero mid-game), so it was never a live bug
+until this step made it reachable. Fixed with a small, targeted guard
+at the top of `showEndGameWindow()` (`gameEndManager.js`): a falsy
+`winner` now renders a plain "Game Over — No players remain." message
+and returns immediately, without touching any of the existing
+scoreboard/stats rendering used for every normal (1+ player) ending.
+
+### Not done in this entry (explicitly, per instruction)
+
+- No Treasure Chest / Reward Chest / Legacy Chest work.
+- No departure UI/button, confirmation dialog, or notifications.
+- No new turn-rotation rules, no `HistoryManager` changes, no contract
+  changes, no active-effect changes, no scoring changes.
+- No reconnection, no new `DepartureManager`, no second player list.
+- No change to the minimum player count required to *start* a new
+  game — this step is about automatic ending caused by departure only.
+- No unrelated game-ending changes — `endGame()` itself is completely
+  unmodified; only its one crash-prone edge case (zero players) was
+  guarded.
+
+### Verification performed
+
+17-part Node test (via `vm`, against the real files —
+`threatDatabase.js`, `contractDatabase.js`, `contractManager.js`,
+`threatManager.js`, `gameEndManager.js`, and the modified `players.js`
+together). Covered every requested edge: 5→4/4→3/3→2 all leave
+`gameEnded: false`; 2→1 sets it `true`; 1→0 (the genuinely fragile
+edge) doesn't throw and still ends the game safely; an invalid id
+triggers neither removal nor game-end; the existing board-exhaustion
+win path and the existing tie→Sudden-Death path were both
+regression-checked completely unaffected; Step 4's existing cleanup
+(contract cancellation, Threat cooldown clearing) confirmed to still
+run and complete *before* the new game-end trigger fires within the
+same 2→1 call; source-text checks confirming `departPlayer()` calls
+`GameEndManager.endGame()` by name without ever setting `.gameEnded`
+or computing a winner itself, no chest code, and no
+`DepartureManager`/duplicate game-ending system anywhere. `git diff
+--name-only` confirmed exactly the two expected files were modified.
+
+**Could not verify:** actual browser rendering of the "Game Over — No
+players remain." message (visual layout) — Node-level verification
+only, confirming `gameEnded` becomes `true` without throwing.
+
+**Architectural limitation discovered:** the zero-player crash
+described above — resolved within this step via a minimal guard, not
+left open as a blocker.
+
+### Next unfinished step
+
+Whatever Player Departure Step 6 turns out to be — not to be started
+without explicit instruction, per this step's scope.

@@ -1,8 +1,8 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `114b195` — "Player Departure Step 4
-— state cleanup (`js/game/players.js`, `contractManager.js`,
-`threatManager.js`)"
+**Last updated against commit:** `0620226` — "Player Departure Step 5
+— minimum-player game end (`js/game/players.js`,
+`gameEndManager.js`)"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -298,13 +298,33 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
   - **REMOVE — active-player status**: unchanged from Step 1/2,
     `removePlayer()` still does this via `splice`.
   Both new manager calls happen *before* `removePlayer()`, while the
-  player is still findable. Nothing calls `departPlayer()` yet either
-  — still no UI, no History recording of the departure itself, no
-  chest creation, no game-ending checks.
-- NOT STARTED: departure UI/button, confirmation dialog, game-ending
-  checks triggered by departure, History recording of a departure, Legacy
-  Chest creation (see Treasure Chests below — the two features are
-  linked but neither is built).
+  player is still findable.
+- DONE (Step 5): the minimum-player rule. After `removePlayer()`,
+  `departPlayer()` checks `GameNight.players.length < 2` and, if so,
+  calls the existing `GameEndManager.endGame()` — the codebase's single
+  existing authority over ending the game (already called the same way
+  from `Board`'s tile-consumption path via `checkBoardExhausted()`).
+  `departPlayer()` decides nothing about winners or what "ended" means;
+  it only triggers the same existing mechanism. `endGame()`'s own
+  `if(this.gameEnded) return;` guard already makes a departure after
+  the game has already ended harmless, so no additional guard was
+  needed in `players.js` for that.
+  A real, previously-latent crash was found and fixed while
+  implementing this: `endGame()` with zero players computes
+  `leaders[0]` as `undefined` (via `Math.max()` on an empty score
+  list), and `showEndGameWindow(undefined)` would then throw reading
+  `winner.name`/`winner.score` — a scenario that was structurally
+  impossible before Player Departure existed, since no prior code path
+  could ever reduce `GameNight.players` to zero mid-game. Fixed with a
+  small, backward-compatible guard at the top of `showEndGameWindow()`:
+  when `winner` is falsy, it shows a plain "Game Over — No players
+  remain." message and returns, without touching any of the existing
+  scoreboard/stats logic used for every normal (1+ player) ending.
+  Nothing calls `departPlayer()` yet — still no UI, no History
+  recording of the departure itself, no chest creation.
+- NOT STARTED: departure UI/button, confirmation dialog, History
+  recording of a departure, Legacy Chest creation (see Treasure Chests
+  below — the two features are linked but neither is built).
 
 ## Systems: prepared but intentionally NOT implemented (architecture only)
 
@@ -355,7 +375,8 @@ further Threat Engine work is currently queued.
 
 Player Departure — in progress. `Players.departPlayer(playerId)` now
 does the full state cleanup (contracts cancelled, Threat cooldown
-cleared, score/History preserved, `currentPlayer` kept valid) but
-nothing calls it yet — no UI, no History recording of the departure
-itself, no chest creation, no game-ending checks. See the dedicated
-section below.
+cleared, score/History preserved, `currentPlayer` kept valid) and
+automatically ends the game via the existing `GameEndManager` when a
+departure leaves fewer than 2 players — but nothing calls
+`departPlayer()` yet: no UI, no History recording of the departure
+itself, no chest creation. See the dedicated section below.

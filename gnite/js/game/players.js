@@ -216,6 +216,14 @@ const Players = {
     // player is still findable/valid, and are individually guarded
     // exactly the way every other optional-manager call in this
     // codebase already is.
+    //
+    // Player Departure, Step 5: the minimum-player rule (see the check
+    // right after removePlayer() below). Deliberately does NOT decide
+    // what "the game has ended" means, compute a winner, or touch
+    // GameEndManager.gameEnded directly -- GameEndManager.endGame()
+    // (the codebase's single existing authority over ending the game)
+    // is called unchanged, exactly the same way Board already calls it
+    // via checkBoardExhausted(). No new game-ending system exists here.
     departPlayer(playerId) {
 
         const player = GameNight.players.find(
@@ -243,6 +251,24 @@ const Players = {
         }
 
         const removed = this.removePlayer(playerId);
+
+        // Player Departure, Step 5: the minimum-player rule. Reuses
+        // the existing GameEndManager.endGame() -- the single existing
+        // authority over ending the game (see its own file header
+        // comment) -- rather than deciding anything about winners or
+        // game-over state here. Checked AFTER removePlayer() so the
+        // roster is already final; GameNight.players is the single
+        // source of truth for "how many are left", nothing counted
+        // separately. endGame() already no-ops if the game already
+        // ended (its own `if(this.gameEnded) return;` guard), so a
+        // departure after the game is already over is harmless.
+        if(typeof GameEndManager !== "undefined" &&
+
+           GameNight.players.length < 2){
+
+            GameEndManager.endGame();
+
+        }
 
         return { success: true, player: removed };
 
