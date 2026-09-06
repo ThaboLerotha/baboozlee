@@ -76,6 +76,18 @@ const ThreatManager = {
 
     },
 
+    // Player Departure: the one piece of per-player state ThreatManager
+    // owns outside the player object itself. Doesn't decide anything
+    // (not a Threat decision) -- just clears an id that no longer
+    // corresponds to an active player, so playerCooldowns doesn't
+    // silently accumulate orphaned entries for departed players. Safe
+    // to call for an id that was never on cooldown at all.
+    clearPlayerCooldown(playerId){
+
+        delete this.playerCooldowns[playerId];
+
+    },
+
     // Independent of player count: always tiles-used / total tiles on
     // the fixed 30-tile board, whatever the board's actual size is.
     getBoardProgress(){

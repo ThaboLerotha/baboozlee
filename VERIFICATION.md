@@ -1369,6 +1369,101 @@ is no UI in this step to verify.
 
 ---
 
+## VERIFIED — Player Departure, Step 4: state cleanup (players.js, contractManager.js, threatManager.js)
+
+**Verified against commit:** `114b195`
+
+**Systems/files involved:** `js/game/players.js` (`departPlayer()` now
+also calls two new manager methods before delegating to `removePlayer()`),
+`js/managers/contractManager.js` (new `cancelAllContracts(playerId)`),
+`js/managers/threatManager.js` (new `clearPlayerCooldown(playerId)`).
+Each new method lives in the actual existing owner of the state it
+touches — confirmed by searching the whole codebase for every
+`[playerId]`-keyed structure outside the player object before writing
+any code (`ContractManager.assignments`/`firedTriggers`/
+`contractsLocked`, `GameEndManager.suddenDeath.scores`/`roundAnswered`,
+`ThreatManager.playerCooldowns`). `GameEndManager`'s Sudden Death state
+was deliberately left untouched — it's tie-break bookkeeping, not a
+persistent "active effect," and the task's own file list didn't
+include it as one to modify.
+
+**State-cleanup behavior implemented:**
+- **KEEP — score**: untouched. Still present on the returned player
+  object exactly as it was.
+- **KEEP — History**: untouched. `departPlayer()` never references
+  `HistoryManager`, so nothing is ever deleted from it.
+- **REMOVE — contracts**: `ContractManager.cancelAllContracts(playerId)`
+  marks every `active` instance — Starting and Optional alike — with
+  a new terminal status `"cancelled"`, distinct from `"wiped"`
+  (Threat-Engine/Optional-only) and `"failed"` (implies the contract's
+  own fail condition fired). Gated the same way every other terminal
+  status already is, so a cancelled contract can never later complete
+  or pay a reward.
+- **REMOVE — active effects**: `ThreatManager.clearPlayerCooldown(playerId)`
+  deletes that player's `playerCooldowns` entry — the one piece of
+  per-player state ThreatManager owns outside the player object.
+  Every other effect (`shield`/`frozen`/`skipTurns`/`bonusTurn`/
+  `doublePoints`/`passesRemaining`) lives directly on the player
+  object being removed, so no separate action is needed for those.
+- **REMOVE — active-player status**: unchanged, still `removePlayer()`'s
+  `splice`.
+
+**What was tested (36-part Node test against the real files, run
+through `vm` — `threatDatabase.js`, `contractDatabase.js`,
+`contractManager.js`, `threatManager.js`, and the modified
+`players.js` loaded together):**
+1. Non-current player departs → removed from roster, `currentPlayer`
+   still valid, still points at the correct original player.
+2/3. Current player departs → removed safely, `currentPlayer` stays
+   in-bounds and resolves to an eligible remaining player.
+5/6. Score preserved on the returned player object; source-text check
+   confirms `departPlayer()` never references `HistoryManager` at
+   all.
+7. A real `startGame()`-assigned Starting contract AND a real,
+   manually-assigned Optional contract both confirmed `"cancelled"`
+   after departure (not just the Optional one, unlike
+   `wipeOptionalContracts()`); `getActiveContracts()` returns empty
+   afterward; a cancelled contract confirmed immune to a subsequent
+   `updateProgress()` call.
+8. A real Threat cooldown (driven via a forced-guaranteed punishment
+   roll against the real `ThreatManager`) confirmed cleared to 0 after
+   departure.
+9/10. A second, surviving player's score, Shield, active contract, and
+   Threat cooldown all confirmed completely untouched by another
+   player's departure.
+11. Invalid id: no throw, clear `{ success: false, reason:
+   "invalid-player" }`, zero state change to roster or `currentPlayer`.
+12. 2 → 1 players: no throw, exactly one valid remaining player.
+13. 1 → 0 players: no throw, empty roster, `currentPlayer` safely `0`,
+   `getCurrentPlayer()` returns `undefined` without throwing.
+14/15. Source-text checks confirming no `GameEndManager` reference (no
+   automatic game-ending) and no chest-status assignment anywhere in
+   `departPlayer()`, `cancelAllContracts()`, or `clearPlayerCooldown()`.
+16. `createPlayers()`/`getCurrentPlayer()` regression-checked
+   unchanged.
+17. No `DepartureManager` or second player list anywhere in the file;
+   `departPlayer()` confirmed to call the two new methods by name
+   (not reach into `ContractManager.assignments`/
+   `ThreatManager.playerCooldowns` as a direct assignment); `git diff
+   --name-only` confirmed exactly the three expected files were
+   modified.
+
+**Would require rerun if:** any KEEP/REMOVE rule changes, a new
+per-player-keyed structure is added to any manager without an
+accompanying cleanup method, or `cancelAllContracts()`/
+`clearPlayerCooldown()`'s own logic changes.
+
+**Known, still-deferred (not a defect, per this step's explicit
+scope):** nothing calls `departPlayer()` yet — no UI, no departure
+History entry, no Legacy Chest creation, no automatic game-ending at
+low player counts (explicitly deferred to a separate future step per
+this step's own instructions).
+
+**Could not verify:** nothing browser/UI-related applies here — there
+is no UI in this step to verify.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

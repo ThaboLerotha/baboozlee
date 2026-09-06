@@ -501,6 +501,54 @@ const ContractManager = {
 
     },
 
+    // Player Departure: cancels ALL of this player's contracts --
+    // Starting AND Optional alike, unlike wipeOptionalContracts()
+    // above, which is Optional-only by design for the Threat Engine's
+    // CONTRACT_WIPE punishment specifically. A departing player's
+    // contracts are lost entirely, not selectively preserved.
+    // A distinct "cancelled" terminal status -- not "wiped" (Threat-
+    // specific meaning) and not "failed" (implies the contract's own
+    // fail condition triggered, which didn't happen here) -- so
+    // completeContract()/updateProgress()/_dispatch() (all gated on
+    // status === "active") can never act on a cancelled instance
+    // again and no reward can be accidentally paid. Returns the list
+    // of instances actually cancelled (empty if the player had none).
+    cancelAllContracts(playerId) {
+
+        if(!this.enabled){
+
+            return [];
+
+        }
+
+        const instances = this.assignments[playerId] || [];
+
+        const cancelled = [];
+
+        instances.forEach(instance => {
+
+            if(instance.status !== "active"){
+
+                return;
+
+            }
+
+            instance.status = "cancelled";
+
+            cancelled.push(instance);
+
+        });
+
+        if(cancelled.length > 0){
+
+            this.renderPanel();
+
+        }
+
+        return cancelled;
+
+    },
+
     // Generic progress update. What `amount` represents is entirely up
     // to whatever type handler triggered it -- ContractManager just
     // adds it to the instance's progress and checks it against the

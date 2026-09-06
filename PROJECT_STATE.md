@@ -1,7 +1,8 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `bcc5cc1` — "Player Departure Step 3
-— departure entry point (`js/game/players.js`)"
+**Last updated against commit:** `114b195` — "Player Departure Step 4
+— state cleanup (`js/game/players.js`, `contractManager.js`,
+`threatManager.js`)"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -266,8 +267,39 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
   shape matches this codebase's existing decision/outcome-object
   convention (`ThreatManager.registerHarmfulEvent()`,
   `ThreatConsequences.apply()` — `{ <flag>: boolean, reason?, ...details }`)
-  rather than a bare boolean or a thrown error. Nothing calls
-  `departPlayer()` yet either — still no UI, no History recording, no
+  rather than a bare boolean or a thrown error.
+- DONE (Step 4): `departPlayer()` now also performs the full
+  KEEP/REMOVE state cleanup, delegating each piece to its actual
+  existing owner rather than reaching into any manager's internals
+  directly:
+  - **KEEP — score and History**: untouched, by doing nothing to
+    either. Score lives on the returned player object exactly as it
+    was; nothing in `departPlayer()` references `HistoryManager` at
+    all, so no History entries are ever deleted.
+  - **REMOVE — contracts**: new `ContractManager.cancelAllContracts(playerId)`
+    marks every one of that player's `active` contract instances —
+    Starting *and* Optional alike — with a new terminal status
+    `"cancelled"` (distinct from `"wiped"`, which is Threat-Engine-
+    specific and Optional-only by design, and from `"failed"`, which
+    implies the contract's own fail condition triggered). Gated the
+    same way `completeContract()`/`updateProgress()`/`_dispatch()`
+    already gate on `status === "active"`, so a cancelled contract can
+    never later pay a reward.
+  - **REMOVE — active effects**: new `ThreatManager.clearPlayerCooldown(playerId)`
+    deletes that player's entry from `playerCooldowns` — the one piece
+    of per-player state ThreatManager owns outside the player object
+    itself (confirmed by searching the whole codebase for every
+    `[playerId]`-keyed structure before writing any code). Every other
+    "active effect" — `shield`/`frozen`/`skipTurns`/`bonusTurn`/
+    `doublePoints`/`passesRemaining` — lives directly as a field ON
+    the player object being removed, so no separate cleanup exists to
+    perform for those; nothing else in the codebase reads those fields
+    off a player no longer in `GameNight.players`.
+  - **REMOVE — active-player status**: unchanged from Step 1/2,
+    `removePlayer()` still does this via `splice`.
+  Both new manager calls happen *before* `removePlayer()`, while the
+  player is still findable. Nothing calls `departPlayer()` yet either
+  — still no UI, no History recording of the departure itself, no
   chest creation, no game-ending checks.
 - NOT STARTED: departure UI/button, confirmation dialog, game-ending
   checks triggered by departure, History recording of a departure, Legacy
@@ -321,9 +353,9 @@ Board's Threat status display, and Threat notifications
 (level-increase and punishment) are all live in real gameplay. No
 further Threat Engine work is currently queued.
 
-Player Departure — in progress. `Players.removePlayer(playerId)`
-(the primitive, index-safe as of Step 2) and `Players.departPlayer(playerId)`
-(the entry point future functionality should actually call) both
-exist, but nothing calls `departPlayer()` yet — no UI, no History
-recording, no chest creation, no game-ending checks. See the
-dedicated section below.
+Player Departure — in progress. `Players.departPlayer(playerId)` now
+does the full state cleanup (contracts cancelled, Threat cooldown
+cleared, score/History preserved, `currentPlayer` kept valid) but
+nothing calls it yet — no UI, no History recording of the departure
+itself, no chest creation, no game-ending checks. See the dedicated
+section below.

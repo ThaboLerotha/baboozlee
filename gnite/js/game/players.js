@@ -171,11 +171,10 @@ const Players = {
 
     },
 
-    // Player Departure, Step 3: the departure entry point. Nothing
-    // yet calls this either -- still no UI, no History recording, no
-    // chest creation. This exists purely as the one seam future
-    // departure functionality should call, instead of manipulating
-    // GameNight.players or calling removePlayer() directly:
+    // Player Departure, Step 3: the departure entry point. This
+    // exists purely as the one seam future departure functionality
+    // should call, instead of manipulating GameNight.players or
+    // calling removePlayer() directly:
     //   UI (future) -> Players.departPlayer(playerId) -> removePlayer()
     //
     // Deliberately thin: validates the player exists (so callers get
@@ -190,6 +189,33 @@ const Players = {
     // decision/action outcome object (see ThreatManager.registerHarmfulEvent()
     // and ThreatConsequences.apply(), both { <flag>: boolean, reason?
     // string, ...details }), rather than a bare boolean or throwing.
+    //
+    // Player Departure, Step 4: state cleanup, delegated entirely to
+    // each state's actual existing owner rather than reached into
+    // directly from here (per KEEP/REMOVE rules -- score and History
+    // are untouched by doing nothing to them at all):
+    //   - Contracts (ContractManager.assignments[playerId]) -- cancelled
+    //     via the new ContractManager.cancelAllContracts(playerId),
+    //     Starting AND Optional alike (unlike wipeOptionalContracts(),
+    //     which is Optional-only for a different, Threat-specific
+    //     reason). "Cancelled and lost", per the departure rule.
+    //   - Threat cooldown (ThreatManager.playerCooldowns[playerId]) --
+    //     the one piece of per-player "active effect" state that lives
+    //     outside the player object itself; cleared via the new
+    //     ThreatManager.clearPlayerCooldown(playerId).
+    //   - Every other "active effect" (shield/frozen/skipTurns/
+    //     bonusTurn/doublePoints/passesRemaining) lives directly as a
+    //     field ON the player object being removed below -- once
+    //     that object leaves GameNight.players, nothing else in the
+    //     codebase reads those fields off it, so no separate cleanup
+    //     action exists to take (there is no effects manager or
+    //     second copy of this state anywhere to clean up -- confirmed
+    //     by searching the whole codebase for other per-player-keyed
+    //     state before writing any of this).
+    // Both cleanup calls happen BEFORE removePlayer(), while the
+    // player is still findable/valid, and are individually guarded
+    // exactly the way every other optional-manager call in this
+    // codebase already is.
     departPlayer(playerId) {
 
         const player = GameNight.players.find(
@@ -201,6 +227,18 @@ const Players = {
         if(!player){
 
             return { success: false, reason: "invalid-player", playerId };
+
+        }
+
+        if(typeof ContractManager !== "undefined"){
+
+            ContractManager.cancelAllContracts(playerId);
+
+        }
+
+        if(typeof ThreatManager !== "undefined"){
+
+            ThreatManager.clearPlayerCooldown(playerId);
 
         }
 
