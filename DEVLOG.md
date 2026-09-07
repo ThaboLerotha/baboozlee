@@ -2705,3 +2705,93 @@ left open as a blocker.
 
 Whatever Player Departure Step 6 turns out to be — not to be started
 without explicit instruction, per this step's scope.
+
+## Entry 30 — Treasure Chests: Step 1 (chest state model)
+
+### What changed
+
+Started Treasure Chests, a separate feature line from Player
+Departure/Threat Engine (though the design links Legacy Chests to
+departures). Searched the codebase for every existing chest reference
+first — confirmed `GameNight.rewardChestStatus`/`legacyChestStatus`
+were pure placeholder strings, read only by `informationBoard.js`,
+never assigned anywhere by anything. Per their own known-placeholder
+status, implemented the smallest clean state representation rather
+than trying to "formalize" fields that never held real structure.
+
+`engine/app.js`: replaced both placeholder fields entirely with
+`GameNight.rewardChest`/`GameNight.legacyChest` — single objects (or
+`null`), never lists, so "at most one of each" is structurally
+guaranteed rather than a convention to remember. `rewardChest` is
+always a real object once a game starts (`{ found: false, contents:
+null }`), matching the design's "exists from the beginning" rule;
+`found`/`contents` are reserved fields for later steps (discovery,
+reward-bundle generation), unused for now. `legacyChest` stays `null`
+until a future step creates it. New `GameNight.resetChests()` is the
+reset point — deliberately not folded into `GameNight.initialize()`,
+which (per Threat Engine Step 5's own finding) only ever runs once at
+`window.onload` and can't serve as a per-game reset.
+
+`ui.js` and `gameEndManager.js`: one `GameNight.resetChests()` call
+added at each of the same two real "new game begins" boundaries
+`ThreatManager.initialize()` already uses (`ui.js`'s Start Game
+handler, `gameEndManager.js`'s `newGameWithSamePlayers()`) — reusing
+the exact proven pattern rather than inventing a new reset convention.
+
+`informationBoard.js`: Treasure Status now reads
+`GameNight.rewardChest.found`/`GameNight.legacyChest` directly instead
+of the old placeholder strings — no second source of truth. Display
+text is unchanged today (still "Not yet available"/"Not Created" on a
+fresh game, since nothing sets `found` or creates a Legacy Chest yet),
+but now genuinely derived from live state instead of two fields
+nothing ever wrote to.
+
+### Not done in this entry (explicitly, per instruction)
+
+- No board placement, hidden chest locations, chest tiles, discovery,
+  or opening/claiming.
+- No Reward Chest reward-bundle generation, no Legacy Chest asset
+  transfer or merging.
+- No Player Departure integration — `players.js` has zero diff;
+  `departPlayer()` does not create or write to a Legacy Chest.
+- No departure UI, chest protection, chest events, chest
+  notifications, player joining, late-entry bonuses, or dynamic
+  turn-rotation changes.
+- No new manager — the state lives directly on `GameNight`, the same
+  place `players`/`currentPlayer`/`board` already live.
+
+### Verification performed
+
+28-part Node test (via `vm`, against the real `engine/app.js` and
+`informationBoard.js` together). Confirmed `rewardChest`/`legacyChest`
+are always a single object or `null` (never an array), with no
+sibling list field anywhere on `GameNight` that could hold a second
+chest; confirmed `resetChests()` produces genuinely fresh state even
+after both fields were deliberately dirtied first; confirmed via
+source-text and position checks that exactly one `resetChests()` call
+exists in each of the two real new-game boundary files, and that the
+`gameEndManager.js` call is genuinely inside `newGameWithSamePlayers()`;
+confirmed `resetChests()` references no player/score/transfer logic
+and `app.js` contains no board-placement code; `git diff --stat`
+confirmed zero diff across 8 Player-Departure/Threat-Engine-adjacent
+files; confirmed the old placeholder field names are gone everywhere
+and `informationBoard.js` now reads the new model, with the real
+`InformationBoard.render()` run end-to-end via a capturing DOM stub —
+confirmed unchanged display text on a fresh reset and correctly
+flips to "Found"/"Created" when the real model's fields are set;
+confirmed `GameNight.initialize()` still runs without throwing and
+does not itself touch chest state at all.
+
+**Could not verify:** actual browser rendering/visual layout of the
+Information Board's Treasure Status text — Node-level verification
+only, via a capturing DOM stub, not a rendered-browser confirmation.
+
+**Architectural limitation discovered:** none — the existing
+placeholder fields and the two real new-game boundaries already
+established by Threat Engine Step 5 were sufficient to build a clean,
+correct state model with no blocker.
+
+### Next unfinished step
+
+Whatever Treasure Chests Step 2 turns out to be — not to be started
+without explicit instruction, per this step's scope.

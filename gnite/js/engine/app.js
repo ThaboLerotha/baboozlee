@@ -27,6 +27,18 @@ const GameNight = {
 
     board: [],
 
+    // Treasure Chests, Step 1: authoritative in-memory state model
+    // only -- no board placement, no discovery, no reward generation,
+    // no asset transfer, all separate later steps. A single object
+    // (never a list) means "at most one Reward Chest" is structurally
+    // guaranteed, not just a rule someone has to remember to follow;
+    // null vs. a single object does the same for the Legacy Chest.
+    // Read by informationBoard.js; nothing else sets or reads these
+    // yet.
+    rewardChest: null,
+
+    legacyChest: null,
+
     initialize() {
 
       QuestionManager.initialize();
@@ -60,6 +72,27 @@ if(typeof GameEndManager !== "undefined"){
 UI.initialize();
 
 console.log("Game Night Engine Loaded");
+
+    },
+
+    // Treasure Chests, Step 1: the chest-state reset point. Called
+    // from the same two real "new game begins" boundaries
+    // ThreatManager.initialize() already uses (ui.js's Start Game
+    // handler, gameEndManager.js's newGameWithSamePlayers()) --
+    // GameNight.initialize() above only ever runs once, at
+    // window.onload, so it can't be relied on for a per-game reset
+    // any more than it could for ThreatManager (see DEVLOG Entry 20).
+    resetChests() {
+
+        this.rewardChest = {
+
+            found: false,
+
+            contents: null
+
+        };
+
+        this.legacyChest = null;
 
     }
 

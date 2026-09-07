@@ -15,11 +15,11 @@ event) cross-referenced with EventDatabase's `category` field -- not
 from a separate tracked count, so it can never drift out of sync with
 the actual board.
 
-Treasure Status reads GameNight.rewardChestStatus / legacyChestStatus
-if they exist. Neither is set by anything yet -- the Treasure Chest
-system itself is deferred (see DEVLOG). This just defines the display
-contract a future system can write into, without fabricating chest
-state that doesn't exist.
+Treasure Status reads GameNight.rewardChest / GameNight.legacyChest --
+the authoritative Treasure Chest state model (Treasure Chests Step 1;
+see DEVLOG). Board placement, discovery, and reward generation are all
+separate later steps not yet implemented, so this only reflects
+"found"/"created" status, never a location.
 
 Threat Status (Step 7) reads ThreatManager.getSummary() -- level and
 harmfulEventsResolved come entirely from ThreatManager's own state,
@@ -63,9 +63,20 @@ const InformationBoard = {
 
         });
 
-        const rewardChestStatus = GameNight.rewardChestStatus || "Not yet available";
+        // Reads the authoritative GameNight.rewardChest/legacyChest
+        // model directly -- no separately-tracked display string.
+        // rewardChest exists (a single object, never a list) from the
+        // moment a game starts, but board placement/discovery aren't
+        // implemented yet, so "found" stays false and the display
+        // stays "Not yet available" until a later step actually sets
+        // it -- this reflects real state, not a hardcoded placeholder.
+        const rewardChestStatus = (GameNight.rewardChest && GameNight.rewardChest.found)
 
-        const legacyChestStatus = GameNight.legacyChestStatus || "Not Created";
+            ? "Found"
+
+            : "Not yet available";
+
+        const legacyChestStatus = GameNight.legacyChest ? "Created" : "Not Created";
 
         // Reads ThreatManager's own public summary API (built for
         // exactly this purpose -- see its own comment in

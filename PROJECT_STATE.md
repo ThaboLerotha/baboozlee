@@ -1,8 +1,8 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `0620226` — "Player Departure Step 5
-— minimum-player game end (`js/game/players.js`,
-`gameEndManager.js`)"
+**Last updated against commit:** `e6b7251` — "Treasure Chests Step 1
+— chest state model (`engine/app.js`, `ui.js`, `gameEndManager.js`,
+`informationBoard.js`)"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -326,16 +326,46 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
   recording of a departure, Legacy Chest creation (see Treasure Chests
   below — the two features are linked but neither is built).
 
+## Systems: in progress — Treasure Chests
+
+- DONE (Step 1): the authoritative in-memory state model.
+  `GameNight.rewardChest` and `GameNight.legacyChest` (`engine/app.js`)
+  replace the old never-set `rewardChestStatus`/`legacyChestStatus`
+  placeholder strings entirely — no second source of truth. Both are
+  single objects (or `null`), never a list, so "at most one Reward
+  Chest, at most one Legacy Chest" is structurally guaranteed, not
+  just a rule to remember:
+  - `rewardChest` — always a real object from the moment a game
+    starts (`{ found: false, contents: null }`), matching the design's
+    "exists from the beginning" rule. `found`/`contents` are reserved
+    fields for later steps (discovery, reward-bundle generation) —
+    unused and always `false`/`null` for now.
+  - `legacyChest` — starts and resets to `null` (design's "does NOT
+    exist initially" rule); a later step will set it to a single
+    object once a player departs, and merge into that same object
+    for any subsequent departure, never creating a second one.
+  - `GameNight.resetChests()` is the reset point, called from the
+    same two real "new game begins" boundaries `ThreatManager.initialize()`
+    already uses (`ui.js`'s Start Game handler,
+    `gameEndManager.js`'s `newGameWithSamePlayers()`) — `GameNight.initialize()`
+    itself only runs once, at `window.onload`, so it can't be relied
+    on for a per-game reset any more than it could for `ThreatManager`
+    (see Threat Engine Step 5, Entry 20).
+  - `InformationBoard.render()` updated to read the new model directly
+    (`GameNight.rewardChest.found` → "Found"/"Not yet available";
+    `GameNight.legacyChest` → "Created"/"Not Created") instead of the
+    old placeholder strings — display behavior is unchanged today
+    (still shows the same text as before, since nothing sets `found`
+    or creates a Legacy Chest yet), but now genuinely reads live state
+    instead of two fields nothing ever assigned.
+- NOT STARTED: board placement, hidden chest locations, chest tiles,
+  chest discovery, opening/claiming, Reward Chest reward-bundle
+  generation, Legacy Chest asset transfer/merging, any Player
+  Departure integration (nothing in `players.js` creates or writes to
+  a Legacy Chest yet), chest UI, chest events, chest notifications.
+
 ## Systems: prepared but intentionally NOT implemented (architecture only)
 
-- **Treasure Chests** — `GameNight.rewardChestStatus` /
-  `GameNight.legacyChestStatus` fields exist as the contract a future
-  system would write into. `InformationBoard.render()` already reads
-  them and shows "Not yet available" / "Not Created" since nothing
-  sets them yet. No chest creation/merge/turn-rotation logic exists.
-  Approved design: exactly two possible chests per game (default
-  hidden chest from game start; a Legacy/Departure chest that only
-  exists if a player leaves). Never a collection of multiple chests.
 - **Malicious Contracts** — approved as future work. Contracts whose
   purpose can be to harm another player, even if the holder gains
   nothing. Not implemented. The Threat Engine's `ContractManager`
@@ -380,3 +410,10 @@ automatically ends the game via the existing `GameEndManager` when a
 departure leaves fewer than 2 players — but nothing calls
 `departPlayer()` yet: no UI, no History recording of the departure
 itself, no chest creation. See the dedicated section below.
+
+Treasure Chests — just started. `GameNight.rewardChest`/`legacyChest`
+(a single object or `null` each, never a list) and their per-game
+reset now exist as the authoritative state model, but nothing else is
+built yet: no board placement, no discovery, no reward generation, no
+asset transfer, no Player Departure integration. See the dedicated
+section below.

@@ -1539,6 +1539,95 @@ thrown, not a rendered-browser confirmation.
 
 ---
 
+## VERIFIED — Treasure Chests, Step 1: chest state model (engine/app.js, ui.js, gameEndManager.js, informationBoard.js)
+
+**Verified against commit:** `e6b7251`
+
+**Systems/files involved:** `engine/app.js` (new `GameNight.rewardChest`/
+`GameNight.legacyChest` fields and `resetChests()` method, replacing
+the old never-set `rewardChestStatus`/`legacyChestStatus` placeholder
+strings entirely), `ui.js` and `gameEndManager.js` (one
+`GameNight.resetChests()` call added at each of the two real "new
+game begins" boundaries already established by Threat Engine Step 5),
+`informationBoard.js` (reads the new model directly instead of the
+old placeholders).
+
+**State model established:**
+- `rewardChest` — a single object, never a list; always non-null
+  during an active game (`{ found: false, contents: null }` after
+  reset). `found`/`contents` are reserved for later steps
+  (discovery, reward-bundle generation) and stay `false`/`null` for
+  now.
+- `legacyChest` — `null` until a future step creates it; a single
+  object once created, never a list.
+- `resetChests()` — the reset point, wired into both real per-game
+  boundaries (not `GameNight.initialize()`, which only runs once at
+  page load).
+
+**What was tested (28-part Node test against the real files, run
+through `vm` — `engine/app.js` and `informationBoard.js` loaded
+together):**
+1. `rewardChest` is a genuine single object after reset, never an
+   array; confirmed no sibling list field (`rewardChests`/`chests`)
+   exists anywhere on `GameNight`.
+2. `legacyChest` is `null` after reset; confirmed it can only ever
+   become a single object (never a list) and that no sibling list
+   field (`legacyChests`) exists.
+3/4. Dirtied both fields (simulating "last game's" found chest and a
+   created Legacy Chest with merged assets), then called `resetChests()`
+   again and confirmed both are completely fresh — `rewardChest` back
+   to `{found:false, contents:null}`, `legacyChest` back to `null`.
+5. Source-text confirmed exactly one `GameNight.resetChests()` call
+   exists in each of `ui.js` and `gameEndManager.js`, and that the
+   `gameEndManager.js` call is genuinely positioned inside
+   `newGameWithSamePlayers()` (the last method in the file — confirmed
+   the call site's index is after that method's own start).
+6/7. Structural checks (object vs. array, absence of any list field)
+   proving multiplicity is impossible by construction, not merely by
+   convention.
+8. Source-text check confirming `resetChests()` never references
+   `GameNight.players`, `.score`, or any transfer/merge-sounding
+   identifier.
+9. Source-text check confirming no board-placement or hidden-location
+   code (`GameNight.board[`, `tile.chest`, etc.) exists anywhere in
+   `app.js`.
+10. `git diff --stat` confirmed zero diff on 8 Player-Departure- and
+   Threat-Engine-adjacent files (`players.js`, `contractManager.js`,
+   `threatManager.js`, `threatConsequences.js`, `threatDatabase.js`,
+   `popup.js`, `eventExecutor.js`, `notificationManager.js`).
+11. Confirmed the old placeholder field names no longer appear
+   anywhere in `app.js` or `informationBoard.js`; confirmed
+   `informationBoard.js` now reads `GameNight.rewardChest`/
+   `GameNight.legacyChest` directly. Ran the real
+   `InformationBoard.render()` end-to-end with a capturing DOM stub:
+   confirmed it still renders "Reward Chest: Not yet available" /
+   "Legacy Chest: Not Created" on a fresh reset (display behavior
+   unchanged from before this step), and correctly flips to "Found" /
+   "Created" when the real model's `found`/`legacyChest` fields are
+   set — proving the display genuinely reads live state rather than a
+   hardcoded string.
+12. `GameNight.initialize()` (the page-load path) still runs without
+   throwing (regression), and confirmed via source-text check that it
+   does not itself touch `resetChests`/`rewardChest`/`legacyChest` at
+   all — the per-game reset intentionally lives only at the two real
+   new-game boundaries.
+
+**Would require rerun if:** the state model's shape changes, either of
+the two `resetChests()` call sites move, or `InformationBoard.render()`'s
+Treasure Status derivation changes.
+
+**Known, still-deferred (not a defect, per this step's explicit
+scope):** no board placement, discovery, reward generation, asset
+transfer, or Player Departure integration exists yet — `departPlayer()`
+does not create or write to a Legacy Chest.
+
+**Could not verify:** actual browser rendering/visual layout of the
+Information Board's Treasure Status text — this was Node-level
+verification confirming the generated HTML string's content via a
+capturing DOM stub, not a rendered-browser confirmation.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

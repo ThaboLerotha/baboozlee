@@ -128,6 +128,9 @@ const UI = {
 
                 }
 
+                // Treasure Chests: same reasoning, same boundary.
+                GameNight.resetChests();
+
                 QuestionManager.reset();
 
                 Board.build();
