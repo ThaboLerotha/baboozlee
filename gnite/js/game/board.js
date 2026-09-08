@@ -147,6 +147,35 @@ const Board = {
 
         }
 
+        // =========================================
+        // Reward Chest placement (Treasure Chests, Step 2)
+        // =========================================
+        // Exactly one tile, chosen uniformly at random from the
+        // freshly built board, is marked as the Reward Chest's hidden
+        // location. Purely a location tag on the existing tile object
+        // -- it changes nothing about tile-type generation
+        // (BoardGenerator is untouched, called unchanged above) and
+        // nothing about what the player sees: the tile's visible
+        // number (div.innerHTML, set above) is never touched again
+        // here, and no chest icon/text is added anywhere.
+        // GameNight.rewardChest is the same object resetChests()
+        // already created for this game (Step 1, always called before
+        // build() at both real new-game boundaries) -- this only adds
+        // the location to it, never replaces or duplicates it.
+        const chestTile = GameNight.board[
+
+            Math.floor(Math.random() * GameNight.board.length)
+
+        ];
+
+        chestTile.specialObject = "rewardChest";
+
+        if(GameNight.rewardChest){
+
+            GameNight.rewardChest.tileId = chestTile.id;
+
+        }
+
     },
 
     select(tileID){

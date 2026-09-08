@@ -1628,6 +1628,76 @@ capturing DOM stub, not a rendered-browser confirmation.
 
 ---
 
+## VERIFIED — Treasure Chests, Step 2: hidden Reward Chest board placement (game/board.js)
+
+**Verified against commit:** `e5864d3`
+
+**Systems/files involved:** `game/board.js` only (29 additive lines
+inside `Board.build()`, after the existing tile-building loop).
+`boardGenerator.js` confirmed zero diff — placement deliberately lives
+outside `generateTileType()`, per the task's explicit architectural
+constraint.
+
+**What was implemented:** after building the normal 30 tiles exactly
+as before, one tile is chosen uniformly at random from the freshly
+built `GameNight.board` and gets `specialObject = "rewardChest"` — a
+plain property on the existing tile object, no second board/location
+array. `GameNight.rewardChest.tileId` (the same object Step 1's
+`resetChests()` already created) is set to that tile's `id`. The
+tile's visible DOM number and the rest of the board are completely
+untouched.
+
+**What was tested (20-part Node test against the real files, run
+through `vm` — `boardGenerator.js` and the modified `board.js` loaded
+together, with a DOM stub capturing what each tile cell actually
+renders):**
+1. A fresh board has exactly 30 tiles.
+2/6. Exactly one tile carries `specialObject === "rewardChest"`; all
+   29 others have no `specialObject` property at all.
+3. `GameNight.rewardChest.tileId` matches the actually-marked tile's
+   `id`; the pre-existing `rewardChest` object (with its `found`/
+   `contents` fields from Step 1) is the same object, not replaced.
+4. The marked tile's `used` stays `false` — placement doesn't touch
+   tile-consumption state.
+5. The marked tile's DOM cell still shows its plain visible number
+   (captured and compared directly, not assumed); confirmed no cell
+   anywhere on the board contains chest-related text.
+7. Rebuilt the board twice in sequence (simulating the real reset
+   lifecycle: a fresh `rewardChest` object before each `build()`,
+   matching how `resetChests()` always runs first): each build
+   produces exactly one marker, never an accumulation of two-plus
+   markers, and `tileId` correctly reflects the newest build's
+   location.
+8. Regression: every tile still has its normal fields (`id`, `label`,
+   valid `tileType`, valid `points` from the existing point pool,
+   `used: false`); all 30 DOM cells still created with click handlers
+   wired.
+9. `legacyChest` completely untouched by `Board.build()`; source-text
+   check confirms `board.js` contains no `legacyChest` reference at
+   all.
+- `git diff --stat` confirmed `boardGenerator.js` has zero diff — the
+  architectural constraint against putting placement logic in
+  `generateTileType()` was honored, not just assumed.
+- Source-text check confirming no second board/location array
+  (`chestLocations`, `rewardChestTiles`, etc.) was introduced.
+- `git diff --name-only` confirmed exactly one file in the entire
+  working tree was modified.
+
+**Would require rerun if:** `Board.build()`'s tile-construction loop
+changes, the chest-placement logic's position relative to that loop
+changes, or `GameNight.rewardChest`'s shape changes.
+
+**Known, still-deferred (not a defect, per this step's explicit
+scope):** no chest discovery, opening, claiming, reward-bundle
+generation, Legacy Chest work, or Player Departure integration.
+
+**Could not verify:** actual browser rendering (visual confirmation
+that the tile genuinely looks identical to every other tile on
+screen) — this was Node-level verification of the DOM stub's captured
+`innerHTML` content, not a rendered-browser confirmation.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

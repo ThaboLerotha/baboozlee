@@ -2795,3 +2795,84 @@ correct state model with no blocker.
 
 Whatever Treasure Chests Step 2 turns out to be — not to be started
 without explicit instruction, per this step's scope.
+
+## Entry 31 — Treasure Chests: Step 2 (hidden Reward Chest board placement)
+
+### What changed
+
+Read the actual current `board.js`/`boardGenerator.js` before writing
+anything, rather than assuming from prior documentation — confirmed
+`BoardGenerator.generateTileType()` is purely a tile-type probability
+decision with no board-object concept at all, and that `Board.build()`
+already pushes every tile into `GameNight.board` and creates its DOM
+cell in the same loop, with `div.innerHTML = i` as the tile's only
+visible content.
+
+Added chest placement as a small, separate step immediately after that
+existing loop (not inside it, and explicitly not inside
+`generateTileType()`, per the task's own architectural constraint):
+picks one tile uniformly at random from the freshly built
+`GameNight.board`, sets `specialObject = "rewardChest"` on it — a
+plain property on the existing tile object, no second board or
+location array — and sets `GameNight.rewardChest.tileId` to that
+tile's `id`. `GameNight.rewardChest` itself is the same object Step
+1's `resetChests()` already creates before every real `build()` call
+(confirmed by re-checking the exact call order in both `ui.js` and
+`gameEndManager.js`) — this only adds a `tileId` field to it, never
+replaces or duplicates it.
+
+Nothing about what the player sees changes: the tile's visible number
+(`div.innerHTML`) is set once, earlier in the existing loop, and never
+touched again; no icon, emoji, or text is added anywhere;
+`InformationBoard` was not modified at all in this step (it already
+reads `GameNight.rewardChest.found`, which placement doesn't set — the
+chest stays "Not yet available" in the UI exactly as before, since
+discovery is a separate future step).
+
+### Not done in this entry (explicitly, per instruction)
+
+- No chest opening, reward generation, or reward claiming.
+- No Legacy Chest work of any kind — `legacyChest` untouched,
+  confirmed via source-text check that `board.js` has zero
+  `legacyChest` reference.
+- No Player Departure asset-transfer integration.
+- No chest interaction, scoring changes, Threat Engine changes, or new
+  UI.
+- No change to tile-type generation probabilities —
+  `boardGenerator.js` has zero diff, confirmed via `git diff --stat`,
+  not just left alone by intention.
+- No new manager — the placement logic lives directly in `Board`, the
+  existing owner of `GameNight.board`.
+
+### Verification performed
+
+20-part Node test (via `vm`, against the real `boardGenerator.js` and
+the modified `board.js`, with a DOM stub that actually captures each
+tile cell's rendered content rather than assuming it). Confirmed a
+fresh board has exactly 30 tiles; exactly one carries the
+`specialObject` marker and the other 29 have none at all;
+`GameNight.rewardChest.tileId` matches the real marked tile and the
+pre-existing `rewardChest` object (with its Step 1 `found`/`contents`
+fields) is preserved, not replaced; the marked tile's `used` stays
+`false`; the marked tile's captured DOM content is still its plain
+visible number, and no cell anywhere contains chest-related text;
+rebuilding the board twice in sequence (matching the real
+reset-then-build lifecycle) produces exactly one marker each time,
+never an accumulation, with `tileId` correctly tracking the newest
+build; existing tile fields, the point pool, and DOM/click-handler
+wiring for all 30 cells all regression-checked unchanged; `legacyChest`
+confirmed completely untouched; `git diff --stat` confirmed
+`boardGenerator.js` has zero diff (the architectural constraint
+against touching `generateTileType()` was actually honored, not just
+assumed); source-text check confirmed no second board/location array;
+`git diff --name-only` confirmed exactly one file changed in the
+entire working tree.
+
+**Could not verify:** actual browser rendering — Node-level
+verification of the DOM stub's captured content, not a
+rendered-browser or visual confirmation.
+
+### Next unfinished step
+
+Whatever Treasure Chests Step 3 turns out to be — not to be started
+without explicit instruction, per this step's scope.

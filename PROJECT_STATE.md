@@ -1,8 +1,7 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `e6b7251` — "Treasure Chests Step 1
-— chest state model (`engine/app.js`, `ui.js`, `gameEndManager.js`,
-`informationBoard.js`)"
+**Last updated against commit:** `e5864d3` — "Treasure Chests Step 2
+— hidden Reward Chest board placement (`game/board.js`)"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -358,10 +357,27 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
     (still shows the same text as before, since nothing sets `found`
     or creates a Legacy Chest yet), but now genuinely reads live state
     instead of two fields nothing ever assigned.
-- NOT STARTED: board placement, hidden chest locations, chest tiles,
-  chest discovery, opening/claiming, Reward Chest reward-bundle
-  generation, Legacy Chest asset transfer/merging, any Player
-  Departure integration (nothing in `players.js` creates or writes to
+- DONE (Step 2): hidden Reward Chest board placement.
+  `Board.build()` (`game/board.js`), after building the normal 30
+  tiles exactly as before (`BoardGenerator.generateTileType()`
+  completely untouched — chest placement deliberately lives outside
+  it, not inside), picks exactly one tile uniformly at random from the
+  freshly built `GameNight.board` and sets `tile.specialObject =
+  "rewardChest"` on it — a plain property on the existing tile object,
+  no second board/location array anywhere. `GameNight.rewardChest.tileId`
+  (the same object Step 1's `resetChests()` already created, always
+  called before `build()`) is set to that tile's `id`, so the chest's
+  location is discoverable from either direction (tile → chest, or
+  chest → tile) without redundant state. Nothing about the tile's
+  visible number changes (`div.innerHTML` is never touched by this),
+  no icon/text is added to the DOM, and `InformationBoard` was not
+  touched — the chest stays completely hidden. Rebuilding (a fresh
+  `GameNight.board = []` at the top of `build()`) naturally prevents
+  any accumulation of markers across games.
+- NOT STARTED: chest tiles as a distinct concept, chest discovery,
+  opening/claiming, Reward Chest reward-bundle generation, Legacy
+  Chest asset transfer/merging, any Player Departure integration
+  (nothing in `players.js` creates or writes to
   a Legacy Chest yet), chest UI, chest events, chest notifications.
 
 ## Systems: prepared but intentionally NOT implemented (architecture only)
@@ -411,9 +427,11 @@ departure leaves fewer than 2 players — but nothing calls
 `departPlayer()` yet: no UI, no History recording of the departure
 itself, no chest creation. See the dedicated section below.
 
-Treasure Chests — just started. `GameNight.rewardChest`/`legacyChest`
+Treasure Chests — in progress. `GameNight.rewardChest`/`legacyChest`
 (a single object or `null` each, never a list) and their per-game
-reset now exist as the authoritative state model, but nothing else is
-built yet: no board placement, no discovery, no reward generation, no
-asset transfer, no Player Departure integration. See the dedicated
-section below.
+reset exist, and every new board now hides the Reward Chest on exactly
+one random tile (`tile.specialObject === "rewardChest"`,
+`GameNight.rewardChest.tileId`) — completely invisible to the player.
+Still nothing else: no discovery, no reward generation, no asset
+transfer, no Player Departure integration. See the dedicated section
+below.
