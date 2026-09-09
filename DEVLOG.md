@@ -2876,3 +2876,88 @@ rendered-browser or visual confirmation.
 
 Whatever Treasure Chests Step 3 turns out to be — not to be started
 without explicit instruction, per this step's scope.
+
+## Entry 32 — Treasure Chests: Step 3 (Reward Chest detection popup)
+
+### What changed
+
+Read the actual current `popup.js` before writing anything — traced
+the full `open(tileID)`/`reveal()`/`_resolveTile()`/`continueEvent()`
+lifecycle, confirmed the True Stale Tile branch already establishes
+the pattern of "stop the normal flow, show only Continue" that a chest
+popup should follow, and confirmed `continueBtn`'s click handler is a
+single static call to `Popup.continueEvent()` wired once in `ui.js` —
+not something this step needed to touch.
+
+`open()` now checks `tile.specialObject === "rewardChest"` as its very
+first branch, before computing `hasRealEvent`/`isTrueStaleTile`/
+`noQuestionTile` for the normal tile-type logic — necessary because
+the chest is layered on top of whatever tile type (question/mixed/
+event/stale) was already generated for its location (Step 2), so
+detection has to win over all of them regardless of which one it
+happens to sit on. A new `openRewardChest(tile)` mirrors the True
+Stale Tile branch's button-visibility pattern (hide Reveal/Correct/
+Wrong/Pass/timer, show only Continue) and renders a dedicated "🎁
+REWARD CHEST — You found the Reward Chest!" message, then returns —
+the chest never falls through into question/event rendering.
+
+The harder design question was Continue's actual behavior. Reusing
+the existing `continueEvent()` → `_resolveTile()` path unmodified
+would have fired the tile's real underlying event through
+`EventExecutor.execute()` if the chest happened to land on a `mixed`/
+`event` tile — exactly what the task explicitly forbids ("fire the
+tile's hidden event"). Rather than adding a second interaction system,
+`continueEvent()` itself now checks for the chest marker first and, if
+present, calls `close()` directly — skipping `_resolveTile()`
+entirely, so no points, no event execution, no `Board.markUsed()`, no
+turn advance, no History entry. The tile is left completely
+unconsumed (`used: false`), matching the task's own explicit
+allowance: "it is acceptable for this step to provide only a safe
+close/continue UI and leave actual chest consumption/opening for the
+next step." `GameNight.rewardChest.found` is never touched — nothing
+in the spec yet defines what should set it.
+
+### Not done in this entry (explicitly, per instruction)
+
+- No reward generation, no chest opening/claiming logic.
+- No Legacy Chest work — confirmed via source-text check that
+  `popup.js` has no `legacyChest` reference anywhere.
+- No player resource changes (points, Shield, Pass) from selecting or
+  closing the chest popup.
+- No Threat state changes — confirmed via source-text check that the
+  new chest-handling code has no `ThreatManager` reference.
+- No contract or scoring changes.
+- No new manager, no `BoardGenerator` changes (not read from at all in
+  this step).
+
+### Verification performed
+
+27-part Node test (via `vm`, against the real `popup.js`, with a
+capturing DOM stub and instrumented `Score`/`Board`/`EventExecutor`/
+`HistoryManager`). Confirmed all 4 normal tile types
+(question/event/mixed/true-stale) render exactly as before with no
+chest content; confirmed the chest popup correctly appears regardless
+of which of the 4 underlying tile types the chest happens to be
+layered on (tested all 4 explicitly), with no question/event content
+leaking through in any case, and confirmed a sibling non-chest tile
+never shows chest content; confirmed opening the popup alone awards no
+points, executes no event, and doesn't mark the tile used; confirmed
+clicking Continue on a chest tile whose underlying tile had a real
+event never actually fires that event, never awards points, never
+marks the tile used, never advances the turn, and never records a
+History entry — while the popup itself genuinely closes; confirmed
+`GameNight.rewardChest.found`/`legacyChest` both completely unchanged
+through the whole cycle; confirmed via source-text checks no
+`ThreatManager` reference in the new code, no `legacyChest` reference
+anywhere in the file, and no second chest/location array; `git diff
+--name-only` confirmed exactly one file changed in the entire working
+tree.
+
+**Could not verify:** actual browser rendering/visual layout of the
+chest popup — Node-level verification of the DOM stub's captured
+state, not a rendered-browser confirmation.
+
+### Next unfinished step
+
+Whatever Treasure Chests Step 4 turns out to be — not to be started
+without explicit instruction, per this step's scope.

@@ -1,7 +1,7 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `e5864d3` — "Treasure Chests Step 2
-— hidden Reward Chest board placement (`game/board.js`)"
+**Last updated against commit:** `0aa6e04` — "Treasure Chests Step 3
+— Reward Chest detection popup (`ui/popup.js`)"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -374,11 +374,27 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
   touched — the chest stays completely hidden. Rebuilding (a fresh
   `GameNight.board = []` at the top of `build()`) naturally prevents
   any accumulation of markers across games.
-- NOT STARTED: chest tiles as a distinct concept, chest discovery,
-  opening/claiming, Reward Chest reward-bundle generation, Legacy
-  Chest asset transfer/merging, any Player Departure integration
-  (nothing in `players.js` creates or writes to
-  a Legacy Chest yet), chest UI, chest events, chest notifications.
+- DONE (Step 3): Reward Chest detection popup. `Popup.open(tileID)`
+  (`ui/popup.js`) checks `tile.specialObject === "rewardChest"` first,
+  before any of the existing question/event/mixed/stale branches
+  (since the chest is layered on top of whatever tile type was already
+  generated for its location) — a new `openRewardChest(tile)` shows a
+  dedicated "🎁 REWARD CHEST — You found the Reward Chest!" popup state
+  (Reveal/Correct/Wrong/Pass/timer all hidden, only Continue shown) and
+  returns early, so a chest tile never falls through into normal
+  rendering. `continueEvent()` (the existing handler the shared
+  Continue button already calls) now checks for the chest marker
+  first too and, if present, just calls `close()` — deliberately
+  *not* `_resolveTile()`, since that would fire the tile's real
+  underlying event (if the chest landed on a `mixed`/`event` tile),
+  mark it used, and advance the turn. The tile stays unconsumed
+  (`used: false`) after Continue, left for a future step to actually
+  implement opening. `GameNight.rewardChest.found` is untouched by
+  any of this — nothing in the spec yet defines what sets it.
+- NOT STARTED: chest opening/claiming, Reward Chest reward-bundle
+  generation, Legacy Chest asset transfer/merging, any Player
+  Departure integration (nothing in `players.js` creates or writes to
+  a Legacy Chest yet), chest notifications.
 
 ## Systems: prepared but intentionally NOT implemented (architecture only)
 
@@ -429,9 +445,10 @@ itself, no chest creation. See the dedicated section below.
 
 Treasure Chests — in progress. `GameNight.rewardChest`/`legacyChest`
 (a single object or `null` each, never a list) and their per-game
-reset exist, and every new board now hides the Reward Chest on exactly
-one random tile (`tile.specialObject === "rewardChest"`,
-`GameNight.rewardChest.tileId`) — completely invisible to the player.
-Still nothing else: no discovery, no reward generation, no asset
-transfer, no Player Departure integration. See the dedicated section
-below.
+reset exist, every new board hides the Reward Chest on exactly one
+random tile, and selecting that tile now shows a dedicated "You found
+the Reward Chest!" popup instead of its normal question/event content
+— Continue safely closes it without consuming the tile, firing its
+real underlying event, or awarding anything. Still nothing else: no
+reward generation, no claiming, no asset transfer, no Player Departure
+integration. See the dedicated section below.

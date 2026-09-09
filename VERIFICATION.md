@@ -1698,6 +1698,74 @@ screen) — this was Node-level verification of the DOM stub's captured
 
 ---
 
+## VERIFIED — Treasure Chests, Step 3: Reward Chest detection popup (ui/popup.js)
+
+**Verified against commit:** `0aa6e04`
+
+**Systems/files involved:** `ui/popup.js` only (140 additive lines —
+a chest-detection branch at the top of `open()`, a new
+`openRewardChest(tile)` method, and a chest-aware branch added to the
+existing `continueEvent()`). No new manager, `BoardGenerator`
+untouched (not read from or referenced by this step at all).
+
+**What was implemented:** `open(tileID)` checks
+`tile.specialObject === "rewardChest"` first, before any existing
+tile-type branch, since the chest can be layered on any of
+question/mixed/event/stale. If present, `openRewardChest()` shows a
+dedicated popup state (all normal interactive buttons hidden except
+Continue) and returns early — the chest never falls through into
+normal rendering. The shared `continueEvent()` (already the handler
+the one Continue button always calls) now checks for the same marker
+and, if present, calls `close()` directly instead of `_resolveTile()`
+— deliberately avoiding the normal resolution path, since that would
+fire the tile's real hidden event (if any), mark it used, and advance
+the turn. `GameNight.rewardChest.found` is never touched.
+
+**What was tested (27-part Node test against the real `popup.js`, run
+through `vm` with a capturing DOM stub and instrumented
+`Score`/`Board`/`EventExecutor`/`HistoryManager` spies):**
+1-4. Normal question/event/mixed/true-stale tiles all render their
+   existing content exactly as before, with no chest text present.
+5-6. The chest popup correctly appears for a chest-marked tile
+   regardless of its underlying `tileType` (tested all 4: question,
+   mixed, event, stale) — no question/event content leaks through in
+   any case; confirmed a sibling non-chest tile on the same board
+   never shows chest content.
+7. Source-text check confirming `board.js` (Step 2's placement code)
+   never writes chest-related text into any tile's DOM content.
+8-10. Opening the chest popup alone: zero `Score.addPoints` calls,
+   zero `EventExecutor.execute` calls, tile `used` stays `false`.
+- Clicking Continue on a chest tile whose *underlying* tile type had a
+  real event (`mixed`/`bomb`): confirmed the event was genuinely never
+  executed, no points awarded, tile still not marked used, turn did
+  not advance (`Score.nextPlayer` never called), no History entry
+  recorded, and the popup DOM element itself actually closes
+  (`hidden` class present afterward).
+11-12. `GameNight.rewardChest.found` and `GameNight.legacyChest` both
+   confirmed completely unchanged by the full open→Continue→close
+   cycle; source-text check confirming the new chest-handling code
+   contains no `ThreatManager` reference and `popup.js` contains no
+   `legacyChest` reference anywhere.
+13. Source-text check confirming no second chest/location array
+   (`chestLocations`, etc.) was introduced — chest location is read
+   only via `tile.specialObject` on the existing `GameNight.board`.
+- `git diff --name-only` confirmed exactly one file in the entire
+  working tree was modified.
+
+**Would require rerun if:** `open()`'s branching order changes,
+`continueEvent()`'s resolution logic changes, or the chest marker
+property name/value changes.
+
+**Known, still-deferred (not a defect, per this step's explicit
+scope):** no chest opening/claiming, reward generation, Legacy Chest
+work, or Player Departure integration.
+
+**Could not verify:** actual browser rendering/visual layout of the
+chest popup — this was Node-level verification of the DOM stub's
+captured state, not a rendered-browser confirmation.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

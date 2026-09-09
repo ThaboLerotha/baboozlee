@@ -27,6 +27,21 @@ const Popup = {
 
         );
 
+        // Treasure Chests, Step 3: the Reward Chest is layered on top
+        // of whatever normal tile type was already generated for its
+        // location (question/mixed/event/stale) -- detected and
+        // handled FIRST, before any tile-type branch below, so a
+        // chest tile never falls through into question/event
+        // rendering and never leaks which type it would otherwise
+        // have been.
+        if(tile.specialObject === "rewardChest"){
+
+            this.openRewardChest(tile);
+
+            return;
+
+        }
+
         const hasRealEvent = tile.event && tile.event.type !== "none";
 
         this.isTrueStaleTile = !!tile.isStale;
@@ -336,6 +351,106 @@ ${infoBlock}
 
     },
 
+    // Treasure Chests, Step 3: a dedicated popup state for the hidden
+    // Reward Chest. Stops the normal tile-resolution flow entirely --
+    // no question, no event teaser, no timer, no Pass/Reveal/Correct/
+    // Wrong -- so the chest is never accidentally treated as a
+    // question or event tile. Only Continue is offered, reusing the
+    // exact existing button/handler (see continueEvent() below, which
+    // detects a chest tile and closes without resolving it) rather
+    // than inventing a parallel interaction system.
+    //
+    // Does not set GameNight.rewardChest.found. Nothing in the current
+    // spec defines "found" as "the popup was opened" -- inventing that
+    // meaning now would be a state-machine decision this step isn't
+    // scoped to make; a future step (actual chest opening/claiming)
+    // is the right place to decide what "found" means and when it
+    // becomes true.
+    openRewardChest(tile){
+
+        if(typeof Timer !== "undefined"){
+
+            Timer.stop();
+
+            Timer.remaining = GameNight.settings.timerSeconds;
+
+            Timer.updateDisplay();
+
+        }
+
+        document
+            .getElementById("popup")
+            .classList.remove("hidden");
+
+        document
+            .getElementById("popupAnswer")
+            .classList.add("hidden");
+
+        document
+            .getElementById("revealAnswerBtn")
+            .classList.add("hidden");
+
+        document
+            .getElementById("correctBtn")
+            .classList.add("hidden");
+
+        document
+            .getElementById("wrongBtn")
+            .classList.add("hidden");
+
+        document
+            .getElementById("passBtn")
+            .classList.add("hidden");
+
+        document
+            .getElementById("continueBtn")
+            .classList.remove("hidden");
+
+        const startBtn = document.getElementById("startTimerBtn");
+
+        const timerDisplay = document.getElementById("timerDisplay");
+
+        if(startBtn){
+
+            startBtn.classList.add("hidden");
+
+        }
+
+        if(timerDisplay){
+
+            timerDisplay.classList.add("hidden");
+
+        }
+
+        // Kept consistent with what these flags mean elsewhere
+        // (reveal() branches on them) even though Reveal is unreachable
+        // from this popup state -- if anything ever did call reveal()
+        // unexpectedly, noQuestionTile:true is the safe fallback (shows
+        // Continue, not Correct/Wrong).
+        this.isTrueStaleTile = false;
+
+        this.noQuestionTile = true;
+
+        document
+            .getElementById("popupQuestion")
+            .innerHTML = `
+
+<h2>Tile ${tile.label}</h2>
+
+<hr><br>
+
+<h2>🎁 REWARD CHEST</h2>
+
+<p>You found the Reward Chest!</p>
+
+`;
+
+        document
+            .getElementById("popupAnswer")
+            .innerHTML = "";
+
+    },
+
     reveal() {
 
         if(typeof Timer !== "undefined"){
@@ -562,7 +677,32 @@ ${infoBlock}
     // function name -- this exists purely so the UI and the code both
     // honestly describe what happened: the tile had no question, and
     // its event is now firing.
+    //
+    // Treasure Chests, Step 3: also the Continue handler for the
+    // Reward Chest popup (see openRewardChest() above, which shows
+    // the same button). A chest tile must never go through
+    // _resolveTile() -- that would fire the tile's real hidden event
+    // if the chest happened to land on a mixed/event tile, mark the
+    // tile used, and advance the turn, none of which are safe or
+    // intended yet. Detected here rather than by giving the chest
+    // popup its own separate button/handler, so the existing
+    // interaction infrastructure (this exact button, this exact
+    // method) is reused rather than duplicated.
     async continueEvent() {
+
+        const tile = GameNight.board.find(
+
+            t => t.id === this.currentTile
+
+        );
+
+        if(tile && tile.specialObject === "rewardChest"){
+
+            this.close();
+
+            return;
+
+        }
 
         await this._resolveTile(false, "continue");
 
