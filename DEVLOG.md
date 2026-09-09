@@ -2961,3 +2961,63 @@ state, not a rendered-browser confirmation.
 
 Whatever Treasure Chests Step 4 turns out to be — not to be started
 without explicit instruction, per this step's scope.
+
+## Entry 33 — Treasure Chests: Step 4 (Reward Chest contents)
+
+### What changed
+
+Confirmed `GameNight.resetChests()` (`engine/app.js`, Step 1) is the
+sole owner/reset point of `rewardChest` before changing anything — no
+other file initializes it.
+
+Added `generateRewardChestContents()`, called once from
+`resetChests()`, returning `{ points: 300, shield: 1, passes: 1 }`
+instead of the previous `contents: null`. Chose values by checking the
+existing game economy first (`game/board.js`'s `pointPool` already
+ranges 100–600 per tile) rather than picking arbitrary numbers — 300
+points sits squarely inside that range; 1 Shield/1 Pass are single-unit
+bonuses, deliberately not a stockpile. Uses the existing
+`score`/`shield`/`passesRemaining` player fields as the vocabulary for
+what the bundle represents; no new resource system was introduced.
+
+### Not done in this entry (explicitly, per instruction)
+
+- No reward claiming — nothing reads `.contents` and applies it to a
+  player yet.
+- No `player.score`/`.shield`/`.passesRemaining` mutation anywhere in
+  this change.
+- `found` not set to `true`, chest not consumed.
+- No changes to `Popup.open()`/`continueEvent()` — `ui/popup.js` has
+  zero diff, confirmed via `git diff --stat`, not just left alone by
+  intention.
+- No reward buttons, no display of individual contents to the player.
+- No Legacy Chest behavior, no board-placement changes — `game/board.js`
+  has zero diff.
+- No second chest-state initialization path — `resetChests()` remains
+  the only place `rewardChest` is created/reset.
+
+### Verification performed
+
+15-part Node test against the real `engine/app.js`. Confirmed a fresh
+reset produces a real contents object (not `null`) with all three
+expected fields; all three values are non-negative and modest;
+dirtying a first reset's contents and resetting again produces a
+genuinely fresh object with the correct values, not a stale
+reused/mutated reference; `found`/`legacyChest` both still correctly
+default; a full player roster confirmed byte-for-byte unchanged after
+`resetChests()`, with a source-text check confirming neither the reset
+method nor the new helper references `GameNight.players` or any
+player-resource assignment; source-text check confirming `tileId` is
+never set by this code, and `git diff --stat` confirming `game/board.js`
+(its actual owner) has zero diff; `git diff --stat` confirming
+`ui/popup.js` has zero diff; `git diff --name-only` confirming exactly
+one file changed in the entire working tree; and a check confirming
+`generateRewardChestContents()` has exactly one call site.
+
+**Could not verify:** N/A — pure data generation, no UI/browser
+behavior in this step.
+
+### Next unfinished step
+
+Whatever Treasure Chests Step 5 turns out to be — not to be started
+without explicit instruction, per this step's scope.

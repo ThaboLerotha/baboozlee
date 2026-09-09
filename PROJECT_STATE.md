@@ -1,7 +1,7 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `0aa6e04` — "Treasure Chests Step 3
-— Reward Chest detection popup (`ui/popup.js`)"
+**Last updated against commit:** `2f2d71d` — "Treasure Chests Step 4
+— Reward Chest contents (`engine/app.js`)"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -391,10 +391,23 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
   (`used: false`) after Continue, left for a future step to actually
   implement opening. `GameNight.rewardChest.found` is untouched by
   any of this — nothing in the spec yet defines what sets it.
-- NOT STARTED: chest opening/claiming, Reward Chest reward-bundle
-  generation, Legacy Chest asset transfer/merging, any Player
-  Departure integration (nothing in `players.js` creates or writes to
-  a Legacy Chest yet), chest notifications.
+- DONE (Step 4): Reward Chest contents. `GameNight.resetChests()`
+  (`engine/app.js`) now generates a real bundle via a new
+  `generateRewardChestContents()` helper — `{ points: 300, shield: 1,
+  passes: 1 }`, modest values within the existing game economy
+  (normal tile points already range 100–600) — instead of leaving
+  `contents: null`. Generated once per reset, not regenerated when the
+  popup opens (`popup.js` only ever reads `.contents`, confirmed zero
+  diff this step). Uses the existing `score`/`shield`/`passesRemaining`
+  player fields as the vocabulary for what the bundle represents; no
+  new resource system. `found` still starts `false`, `legacyChest`
+  still starts `null`, `tileId` is still set only by `Board.build()`
+  (`game/board.js`, confirmed zero diff this step) — `resetChests()`
+  never sets it. No player resource is touched by generation itself.
+- NOT STARTED: chest opening/claiming (nothing reads `.contents` and
+  applies it to a player yet), Legacy Chest asset transfer/merging,
+  any Player Departure integration (nothing in `players.js` creates or
+  writes to a Legacy Chest yet), chest notifications.
 
 ## Systems: prepared but intentionally NOT implemented (architecture only)
 
@@ -446,9 +459,9 @@ itself, no chest creation. See the dedicated section below.
 Treasure Chests — in progress. `GameNight.rewardChest`/`legacyChest`
 (a single object or `null` each, never a list) and their per-game
 reset exist, every new board hides the Reward Chest on exactly one
-random tile, and selecting that tile now shows a dedicated "You found
-the Reward Chest!" popup instead of its normal question/event content
-— Continue safely closes it without consuming the tile, firing its
-real underlying event, or awarding anything. Still nothing else: no
-reward generation, no claiming, no asset transfer, no Player Departure
+random tile, selecting that tile shows a dedicated "You found the
+Reward Chest!" popup instead of its normal question/event content, and
+the chest now carries a real generated `contents` bundle (points/
+shield/passes) instead of `null` — but nothing claims it yet. Still
+nothing else: no claiming, no asset transfer, no Player Departure
 integration. See the dedicated section below.

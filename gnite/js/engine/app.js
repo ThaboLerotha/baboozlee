@@ -82,13 +82,36 @@ console.log("Game Night Engine Loaded");
     // GameNight.initialize() above only ever runs once, at
     // window.onload, so it can't be relied on for a per-game reset
     // any more than it could for ThreatManager (see DEVLOG Entry 20).
+    // Treasure Chests, Step 4: the reward bundle. Generated once here,
+    // at the same reset point Step 1 already established (not
+    // regenerated every time the chest popup opens -- Popup.js only
+    // ever reads GameNight.rewardChest.contents, it never writes to
+    // it). Values are modest, well within the existing game economy
+    // (normal tile points already range 100-600 -- see
+    // game/board.js's pointPool) rather than a new, separate scale.
+    // Uses the existing player resource fields directly (score,
+    // shield, passesRemaining) -- no new resource system.
+    generateRewardChestContents() {
+
+        return {
+
+            points: 300,
+
+            shield: 1,
+
+            passes: 1
+
+        };
+
+    },
+
     resetChests() {
 
         this.rewardChest = {
 
             found: false,
 
-            contents: null
+            contents: this.generateRewardChestContents()
 
         };
 

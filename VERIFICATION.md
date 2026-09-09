@@ -1766,6 +1766,64 @@ captured state, not a rendered-browser confirmation.
 
 ---
 
+## VERIFIED — Treasure Chests, Step 4: Reward Chest contents (engine/app.js)
+
+**Verified against commit:** `2f2d71d`
+
+**Systems/files involved:** `engine/app.js` only (24 additive lines —
+a new `generateRewardChestContents()` helper, called once from the
+existing `resetChests()`). `game/board.js` (Step 2) and `ui/popup.js`
+(Step 3) both confirmed zero diff.
+
+**What was implemented:** `resetChests()` now sets
+`rewardChest.contents` to `{ points: 300, shield: 1, passes: 1 }`
+(via the new helper) instead of `null`. Values chosen to stay within
+the existing game economy — 300 points sits inside the normal tile
+point pool's 100–600 range; 1 Shield/1 Pass are single-unit modest
+bonuses, not stockpiles. Generated once per reset call, not
+regenerated on popup open (confirmed `popup.js` never writes to
+`.contents`).
+
+**What was tested (15-part Node test against the real
+`engine/app.js`):**
+1/2. A fresh reset produces a real object (not `null`) containing
+   `points`/`shield`/`passes` fields.
+3. All three values confirmed non-negative and modest (points ≤ 600,
+   shield/passes ≤ 3 — sanity ceilings well above the actual chosen
+   values, to catch a genuinely absurd number without being
+   over-fitted to today's exact constants).
+4. Dirtied a first reset's contents object, then reset again and
+   confirmed the second call produces a completely different object
+   reference with the correct fresh values — no reuse/mutation of a
+   stale object.
+5/6. `found` still `false`, `legacyChest` still `null` after reset.
+7. A full player roster's state confirmed byte-for-byte unchanged
+   (`deepStrictEqual`) after `resetChests()`; source-text check
+   confirming neither `resetChests()` nor the new helper references
+   `GameNight.players` or any player-resource assignment.
+8. Source-text check confirming the new code never sets `tileId`;
+   `git diff --stat` confirmed `game/board.js` (the actual owner of
+   `tileId`, Step 2) has zero diff.
+9. `git diff --stat` confirmed `ui/popup.js` (Step 3) has zero diff —
+   popup behavior completely untouched.
+10. `git diff --name-only` confirmed exactly one file in the entire
+   working tree was modified.
+- Extra: confirmed `generateRewardChestContents()` is referenced
+   exactly twice in the file (its own definition plus one call site)
+   — a single reset path, not a second one.
+
+**Would require rerun if:** the bundle's values or fields change, or
+`resetChests()`'s call structure changes.
+
+**Known, still-deferred (not a defect, per this step's explicit
+scope):** nothing reads `.contents` and applies it to a player yet —
+no claiming, no Legacy Chest work, no Player Departure integration.
+
+**Could not verify:** N/A — this step has no UI/browser-dependent
+behavior to verify; it's pure data generation.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:
