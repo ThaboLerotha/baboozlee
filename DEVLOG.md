@@ -3021,3 +3021,64 @@ behavior in this step.
 
 Whatever Treasure Chests Step 5 turns out to be — not to be started
 without explicit instruction, per this step's scope.
+
+## Entry 34 — Wrong T/F answer penalty
+
+Standalone gameplay change, not part of the Threat Engine/Player
+Departure/Treasure Chest milestones.
+
+### What changed
+
+Read `Score.subtractPoints()` and the real question database
+(`content/questions/QuestionPack_v1.js`) before writing anything —
+confirmed every question currently has `type: "true_false"`, and
+confirmed the shared `_resolveTile()` in `popup.js` is where
+`outcome` ("correct"/"wrong"/"pass"/"continue") is already
+distinguished.
+
+Added one guarded call inside `_resolveTile()`:
+`if(outcome === "wrong" && tile.question && tile.question.type ===
+"true_false"){ Score.subtractPoints(100); }`. Placed right after the
+existing `if(awardPoints){ Score.addPoints(tile.points); }` block, for
+structural symmetry. Uses `tile.question` (which is `null` for pure
+Event and Stale tiles, by the existing tile data model) as the actual
+scoping mechanism, not a tile-type check — so Event/Stale tiles are
+excluded automatically, and a Mixed tile's question portion is
+correctly included (its separate event, fired further down via
+`EventExecutor.execute()`, is completely unaffected). Uses the
+existing `Score.subtractPoints()` authority, the same one every other
+point-loss mechanic in the codebase already uses (e.g.
+`eventExecutor.js`'s `bombSelf()`) — so this penalty gets the same
+"Points Lost" History entry and `ContractManager.onScoreChange` hook
+every other point loss already gets, for free, rather than a bespoke
+path.
+
+### Not done in this entry (explicitly, per instruction)
+
+- No changes to the existing tile-point value, the Pass system, the
+  question database, UI wording, or animations/notifications.
+- No changes to Event tiles, Stale tiles, Treasure Chests, Contracts,
+  or the Threat Engine — confirmed via `git diff --stat` on
+  `game/board.js`/`engine/app.js`/`informationBoard.js`.
+- No new penalty manager or parallel scoring system.
+
+### Verification performed
+
+16-part Node test (via `vm`, against the real `popup.js` and
+`score.js` together). Confirmed Wrong on a T/F question subtracts
+exactly 100; Correct applies no penalty (only the normal tile-point
+award); Pass applies no penalty; a tile with no question at all never
+triggers the penalty even when the shared resolution path is
+exercised directly with a "wrong" outcome (a defensive check proving
+the guard is question-type-based, not outcome-based alone); existing
+tile-point award, event execution, tile-used marking, turn
+advancement, and the "Answered Incorrectly" History entry are all
+unchanged; source-text check confirming the penalty flows through
+`Score.subtractPoints()`, not a direct score mutation; `git diff
+--stat` confirmed zero diff on the three Treasure Chest files; `git
+diff --name-only` confirmed exactly one file changed in the entire
+working tree.
+
+**Could not verify:** N/A — pure scoring logic, no UI/browser-dependent
+behavior beyond what the Node test already exercises via `Score`'s own
+unmodified DOM-update path.

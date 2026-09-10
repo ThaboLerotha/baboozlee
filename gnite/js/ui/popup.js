@@ -547,6 +547,26 @@ ${infoBlock}
 
         }
 
+        // Step 5: Wrong T/F answer penalty. Scoped to the actual
+        // question's type, not the outcome alone -- tile.question is
+        // null for pure Event and Stale tiles (they have no question
+        // to get wrong), so this can never fire for them without any
+        // extra tile-type check. A Mixed tile's question portion is
+        // still a normal True/False question flow, so it's included
+        // the same as a plain Question tile; its separate event
+        // (fired below via EventExecutor.execute(), unchanged) is not
+        // affected by this at all. Uses the existing Score.subtractPoints()
+        // authority -- same as bombSelf()'s point loss in
+        // eventExecutor.js -- so this penalty gets the same History
+        // "Points Lost" entry and ContractManager.onScoreChange hook
+        // every other point loss already gets, instead of a bespoke
+        // path.
+        if(outcome === "wrong" && tile.question && tile.question.type === "true_false"){
+
+            Score.subtractPoints(100);
+
+        }
+
         if(typeof HistoryManager !== "undefined"){
 
             if(outcome === "correct"){

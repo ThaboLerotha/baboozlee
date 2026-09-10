@@ -1824,6 +1824,56 @@ behavior to verify; it's pure data generation.
 
 ---
 
+## VERIFIED — Wrong T/F answer penalty (ui/popup.js)
+
+**Verified against commit:** `f335f3e`
+
+**Systems/files involved:** `ui/popup.js` only (20 additive lines in
+the shared `_resolveTile()`). Uses the existing
+`Score.subtractPoints()` authority — same call every other point-loss
+mechanic in the codebase already uses (e.g. `eventExecutor.js`'s
+`bombSelf()`) — not a direct `player.score` mutation.
+
+**Rule implemented:** `outcome === "wrong" && tile.question &&
+tile.question.type === "true_false"` → `Score.subtractPoints(100)`.
+Scoped to the actual question's `type` field (confirmed via the real
+question database that every question is currently `"true_false"`,
+but the check doesn't assume that — it reads the field), not merely
+to the `wrong` outcome alone, so pure Event/Stale tiles (`question:
+null`) can never trigger it regardless of outcome.
+
+**What was tested (16-part Node test against the real `popup.js` and
+`score.js` together, run through `vm`):**
+1. Wrong on a T/F question subtracts exactly 100 points (500 → 400).
+2. Correct on the same tile only applies the normal tile-point award,
+   no penalty (500 → 700 on a 200-point tile).
+3. Pass applies no penalty at all (score unchanged).
+4. Directly exercised `_resolveTile(false, "wrong")` against a tile
+   with no question at all (pure Event tile) to defensively confirm
+   the guard is genuinely question-type-based, not just
+   outcome-based — no penalty applied.
+5. Regression: Correct still awards exactly `tile.points`.
+6. Regression: the tile's event still fires, the tile is still marked
+   used, the turn still advances, and the existing "Answered
+   Incorrectly" History entry still fires.
+7. Source-text check confirming the penalty is applied via
+   `Score.subtractPoints(100)`, not a direct `.score -= 100`.
+8. `git diff --stat` confirmed zero diff on `game/board.js`,
+   `engine/app.js`, and `informationBoard.js` (the Treasure Chest
+   system) — untouched.
+9. `git diff --name-only` confirmed exactly one file in the entire
+   working tree was modified.
+
+**Would require rerun if:** the question database's `type` field
+convention changes, or `_resolveTile()`'s outcome-handling structure
+changes.
+
+**Could not verify:** N/A — this is pure scoring logic with no
+UI/browser-dependent behavior beyond what the Node test already
+confirms via `Score`'s own (unmodified) DOM-update path.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

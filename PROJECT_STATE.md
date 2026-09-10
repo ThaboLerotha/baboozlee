@@ -1,7 +1,7 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `2f2d71d` — "Treasure Chests Step 4
-— Reward Chest contents (`engine/app.js`)"
+**Last updated against commit:** `f335f3e` — "Wrong T/F answer penalty
+(`ui/popup.js`)"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -26,7 +26,11 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
 - **Contract system** (`contractManager.js`, `contractTypes.js`,
   `data/contractDatabase.js`, `ui/contractOffer.js`) — 25 production
   contracts, full offer/assign/progress/complete/fail lifecycle.
-- **Scoring & players** (`score.js`, `game/players.js`).
+- **Scoring & players** (`score.js`, `game/players.js`). Wrong T/F
+  question answers incur a flat 100-point penalty via
+  `Score.subtractPoints()` (`ui/popup.js`'s `_resolveTile()`) — scoped
+  to `tile.question.type === "true_false"`, so Event/Stale tiles
+  (`question: null`) are never affected.
 - **Timer** (`timer.js`).
 - **Game history log** (`historyManager.js`) — turn-by-turn record.
 - **Game end / sudden death** (`gameEndManager.js`).
