@@ -3082,3 +3082,69 @@ working tree.
 **Could not verify:** N/A — pure scoring logic, no UI/browser-dependent
 behavior beyond what the Node test already exercises via `Score`'s own
 unmodified DOM-update path.
+
+## Entry 35 — Treasure Chests: Step 5 (claim the Reward Chest contents)
+
+### What changed
+
+Re-read `continueEvent()`'s existing chest branch (Step 3) and
+`Score.addPoints()`/`EventExecutor`'s `shield()` handler before writing
+anything — confirmed `addPoints()` already handles `doublePoints`
+internally (doubling and consuming the flag) and calls `this.update()`
+itself, while a direct `player.shield`/`player.passesRemaining`
+mutation does not auto-refresh the scoreboard.
+
+Added `claimRewardChest()` to `ui/popup.js`, called from
+`continueEvent()`'s existing chest branch only when
+`!GameNight.rewardChest.found`. Awards `GameNight.rewardChest.contents`
+through the existing resource authorities exactly: `Score.addPoints()`
+for points (not a direct `player.score` mutation — deliberately
+inherits its `doublePoints` interaction rather than trying to special-
+case around it, since "use the existing scoring authority" means using
+it faithfully, side effects included), `player.shield = true` (the
+same convention `EventExecutor`'s `shield()` handler already uses —
+Shield is a boolean flag, not a stackable count, regardless of the
+bundle's `shield: 1` value), `player.passesRemaining += contents.passes`.
+Sets `found = true` last, and calls `Score.update()` once to refresh
+the scoreboard for the shield/passes changes (which don't trigger it
+themselves the way `addPoints()` does). `found` is the sole guard
+against a repeat claim — the underlying tile is never touched by any
+of this, since the chest branch still never calls `_resolveTile()`
+(unchanged from Step 3), so there's nothing tile-side that needs a
+separate "already consumed" marker.
+
+### Not done in this entry (explicitly, per instruction)
+
+- No Legacy Chest work, no new chest creation, no board-placement
+  changes — confirmed via `git diff --stat` on `game/board.js`/
+  `engine/app.js`.
+- No chest animations, no popup redesign, no new reward UI, no
+  reward-selection choices.
+- No changes to the stored `contents` values themselves, normal
+  question scoring, Pass behavior, Threat behavior, or Player
+  Departure.
+- No second chest state/source, no new manager.
+
+### Verification performed
+
+24-part Node test (via `vm`, against the real `popup.js` and
+`score.js` together). Confirmed claiming awards exactly the stored
+point amount; confirmed points specifically flow through the real
+`Score.addPoints()` by setting `doublePoints` beforehand and observing
+both the doubled amount and the consumed flag — a result only the real
+authority produces; confirmed Shield and Passes are granted via the
+real player fields; confirmed `found` becomes `true`; confirmed a
+second claim on the same chest awards nothing further and the stored
+`contents` object is the exact same reference, never regenerated;
+confirmed claiming across all 4 underlying tile types never executes
+an event or marks a tile used, in every case; regression-confirmed
+normal question and event tiles still resolve exactly as before;
+source-text check confirming no `legacyChest` reference anywhere;
+`git diff --name-only` confirmed exactly one file changed, with
+`git diff --stat` confirming zero diff on the other four
+Treasure-Chest/scoring-adjacent files.
+
+**Could not verify:** actual browser rendering/visual confirmation of
+claimed resources in the live scoreboard — Node-level verification of
+player state and the correct calls being made, not a rendered-browser
+confirmation.

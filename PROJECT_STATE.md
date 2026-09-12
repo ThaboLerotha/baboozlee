@@ -1,7 +1,7 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `f335f3e` — "Wrong T/F answer penalty
-(`ui/popup.js`)"
+**Last updated against commit:** `d9dc007` — "Treasure Chests Step 5
+— claim the Reward Chest contents (`ui/popup.js`)"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -408,10 +408,25 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
   still starts `null`, `tileId` is still set only by `Board.build()`
   (`game/board.js`, confirmed zero diff this step) — `resetChests()`
   never sets it. No player resource is touched by generation itself.
-- NOT STARTED: chest opening/claiming (nothing reads `.contents` and
-  applies it to a player yet), Legacy Chest asset transfer/merging,
-  any Player Departure integration (nothing in `players.js` creates or
-  writes to a Legacy Chest yet), chest notifications.
+- DONE (Step 5): claiming. `continueEvent()`'s existing chest branch
+  (`ui/popup.js`) now calls a new `claimRewardChest()` when the chest
+  hasn't already been claimed (`!GameNight.rewardChest.found`) before
+  closing the popup. `claimRewardChest()` awards the existing,
+  already-generated `contents` through the same authorities every
+  other reward-granting path in this codebase already uses —
+  `Score.addPoints()` for points (inherits its `doublePoints`
+  interaction the same way any other point award would), the same
+  `player.shield = true` `EventExecutor`'s `shield()` handler uses,
+  `player.passesRemaining += contents.passes` — then sets
+  `GameNight.rewardChest.found = true` and calls `Score.update()` to
+  refresh the scoreboard. `found` is the only thing that prevents a
+  repeat claim; the underlying tile is never touched (`_resolveTile()`
+  is still never called for a chest tile, unchanged from Step 3), so a
+  chest can never accidentally fire its underlying event or get marked
+  used regardless of which of the 4 tile types it's layered on.
+- NOT STARTED: Legacy Chest asset transfer/merging, any Player
+  Departure integration (nothing in `players.js` creates or writes to
+  a Legacy Chest yet), chest notifications.
 
 ## Systems: prepared but intentionally NOT implemented (architecture only)
 
@@ -464,8 +479,9 @@ Treasure Chests — in progress. `GameNight.rewardChest`/`legacyChest`
 (a single object or `null` each, never a list) and their per-game
 reset exist, every new board hides the Reward Chest on exactly one
 random tile, selecting that tile shows a dedicated "You found the
-Reward Chest!" popup instead of its normal question/event content, and
-the chest now carries a real generated `contents` bundle (points/
-shield/passes) instead of `null` — but nothing claims it yet. Still
-nothing else: no claiming, no asset transfer, no Player Departure
-integration. See the dedicated section below.
+Reward Chest!" popup, and Continue now actually claims it — awards the
+generated `contents` bundle to the current player through
+`Score.addPoints()`/`player.shield`/`player.passesRemaining`, sets
+`found = true`, and can never award twice. Still no Legacy Chest work,
+no asset transfer, no Player Departure integration. See the dedicated
+section below.

@@ -1874,6 +1874,74 @@ confirms via `Score`'s own (unmodified) DOM-update path.
 
 ---
 
+## VERIFIED — Treasure Chests, Step 5: claim the Reward Chest contents (ui/popup.js)
+
+**Verified against commit:** `d9dc007`
+
+**Systems/files involved:** `ui/popup.js` only (57 additive lines — a
+new `claimRewardChest()` method, called from the existing
+`continueEvent()`'s chest branch). `game/board.js`, `engine/app.js`,
+`informationBoard.js`, `managers/score.js` all confirmed zero diff.
+
+**What was implemented:** `continueEvent()`'s chest branch now calls
+`claimRewardChest()` before closing, but only if
+`!GameNight.rewardChest.found`. `claimRewardChest()` awards
+`GameNight.rewardChest.contents` via `Score.addPoints()` (points),
+`player.shield = true` (shield — matching `EventExecutor`'s `shield()`
+handler exactly), and `player.passesRemaining += contents.passes`,
+then sets `found = true` and calls `Score.update()`. Contents are
+never regenerated. The underlying tile is never resolved — the chest
+branch still never calls `_resolveTile()`, unchanged from Step 3.
+
+**What was tested (24-part Node test against the real `popup.js` and
+`score.js` together, run through `vm`):**
+1. Claiming awards exactly the stored point amount (200 → 500 on a
+   300-point bundle).
+2. Confirmed points flow through the real `Score.addPoints()`
+   specifically — set `doublePoints: true` beforehand and confirmed
+   the reward was correctly doubled (300 → 600) *and* the flag was
+   consumed, exactly as `addPoints()`'s real internal logic does; a
+   bespoke addition wouldn't reproduce this side effect.
+3. Shield granted via the real `player.shield` field.
+4. Passes added to the real `passesRemaining` field (2 → 3 on a
+   1-pass bundle).
+5. `found` becomes `true` after a successful claim.
+6/7. Claimed once, recorded the resulting score/shield/passes and the
+   `contents` object reference, then opened and continued the same
+   chest a second time: confirmed zero additional score change, no
+   further shield/passes change, and the `contents` object is the
+   exact same reference with the same values — never regenerated.
+8. Tested claiming across all 4 underlying tile types
+   (question/mixed/event/stale): confirmed zero `EventExecutor.execute`
+   calls and zero `Board.markUsed` calls in every case — the
+   underlying tile is never touched regardless of what it would
+   otherwise have been.
+9. Regression: a normal (non-chest) question tile still awards its
+   own tile points and gets marked used exactly as before.
+10. Regression: a normal (non-chest) event tile still executes its
+   event and gets marked used exactly as before.
+11. Source-text check confirming no `legacyChest` reference anywhere
+   in `popup.js`.
+12. `git diff --name-only` confirmed exactly one file in the entire
+   working tree was modified; `git diff --stat` confirmed zero diff
+   on `board.js`/`app.js`/`informationBoard.js`/`score.js`.
+
+**Would require rerun if:** `claimRewardChest()`'s logic changes,
+`continueEvent()`'s chest-branch structure changes, or the `contents`
+bundle's field names change.
+
+**Known, still-deferred (not a defect, per this step's explicit
+scope):** no Legacy Chest work, no Player Departure integration, no
+chest notifications, no new reward UI/animations.
+
+**Could not verify:** actual browser rendering/visual confirmation
+that claimed resources appear correctly in the live scoreboard UI —
+this was Node-level verification of player object state and
+`Score.addPoints()`/`Score.update()` being called correctly, not a
+rendered-browser confirmation.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

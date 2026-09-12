@@ -692,6 +692,53 @@ ${infoBlock}
 
     },
 
+    // Treasure Chests, Step 5: the actual claiming transaction.
+    // Called only from continueEvent() below, and only when the chest
+    // hasn't already been claimed (see the found check there) --
+    // GameNight.rewardChest.found is what prevents a repeat claim, not
+    // anything tile-side, since the underlying tile was never going
+    // to resolve for a chest tile anyway (openRewardChest()/
+    // continueEvent()'s chest branch already keep it out of
+    // _resolveTile() entirely). Awards the existing, already-generated
+    // contents (never regenerates them) through the same resource
+    // authorities every other reward-granting path in this codebase
+    // already uses: Score.addPoints() for points (not a direct
+    // player.score mutation), the same player.shield = true
+    // EventExecutor's shield() handler uses, and
+    // player.passesRemaining += ... matching how that field is always
+    // adjusted elsewhere. Score.update() refreshes the scoreboard
+    // display for the shield/passes changes, which (unlike
+    // Score.addPoints()) don't already trigger it themselves.
+    claimRewardChest(){
+
+        const player = Players.getCurrentPlayer();
+
+        const contents = GameNight.rewardChest.contents;
+
+        if(contents.points){
+
+            Score.addPoints(contents.points);
+
+        }
+
+        if(contents.shield){
+
+            player.shield = true;
+
+        }
+
+        if(contents.passes){
+
+            player.passesRemaining += contents.passes;
+
+        }
+
+        GameNight.rewardChest.found = true;
+
+        Score.update();
+
+    },
+
     // The dedicated resolve action for pure Event tiles. There was
     // never a question, so "Wrong" would be a misleading label and
     // function name -- this exists purely so the UI and the code both
@@ -708,6 +755,10 @@ ${infoBlock}
     // popup its own separate button/handler, so the existing
     // interaction infrastructure (this exact button, this exact
     // method) is reused rather than duplicated.
+    //
+    // Step 5: claims the chest (see claimRewardChest() above) exactly
+    // once -- an already-claimed chest (found already true) just
+    // closes, behaving as already-claimed, never re-awarding.
     async continueEvent() {
 
         const tile = GameNight.board.find(
@@ -717,6 +768,12 @@ ${infoBlock}
         );
 
         if(tile && tile.specialObject === "rewardChest"){
+
+            if(!GameNight.rewardChest.found){
+
+                this.claimRewardChest();
+
+            }
 
             this.close();
 
