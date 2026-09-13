@@ -1,7 +1,7 @@
 # PROJECT_STATE.md
 
-**Last updated against commit:** `d9dc007` — "Treasure Chests Step 5
-— claim the Reward Chest contents (`ui/popup.js`)"
+**Last updated against commit:** `66baa9a` — "Treasure Chests Step 6
+— reward result display (`ui/popup.js`)"
 
 This file is a snapshot, not the source of truth. When in doubt, check the
 repo. Update this file whenever a milestone lands.
@@ -424,6 +424,18 @@ a fixed `<script>` order in `index.html` (see ARCHITECTURE.md).
   is still never called for a chest tile, unchanged from Step 3), so a
   chest can never accidentally fire its underlying event or get marked
   used regardless of which of the 4 tile types it's layered on.
+- DONE (Step 6): reward result display. A new
+  `renderRewardChestResult()` (`ui/popup.js`) reads
+  `GameNight.rewardChest.contents` live (never hardcoded) and writes a
+  dynamic "+N Points / +N Shield / +N Pass" summary into the popup
+  (omitting any zero-value field) right after `claimRewardChest()`
+  runs. The two-click distinction needed no new state: `continueEvent()`'s
+  chest branch checks `found` *before* claiming — the first click
+  (`found` still `false`) claims, renders the result, and deliberately
+  does not close, so the player can actually read it; the next click
+  (`found` now `true`, the same check that already prevented a repeat
+  award) just closes, identical to how reopening an already-claimed
+  chest always behaved.
 - NOT STARTED: Legacy Chest asset transfer/merging, any Player
   Departure integration (nothing in `players.js` creates or writes to
   a Legacy Chest yet), chest notifications.
@@ -479,9 +491,10 @@ Treasure Chests — in progress. `GameNight.rewardChest`/`legacyChest`
 (a single object or `null` each, never a list) and their per-game
 reset exist, every new board hides the Reward Chest on exactly one
 random tile, selecting that tile shows a dedicated "You found the
-Reward Chest!" popup, and Continue now actually claims it — awards the
-generated `contents` bundle to the current player through
-`Score.addPoints()`/`player.shield`/`player.passesRemaining`, sets
-`found = true`, and can never award twice. Still no Legacy Chest work,
-no asset transfer, no Player Departure integration. See the dedicated
-section below.
+Reward Chest!" popup, Continue claims it (awards the generated
+`contents` bundle through `Score.addPoints()`/`player.shield`/
+`player.passesRemaining`, sets `found = true`, never awards twice),
+and the popup now shows the player exactly what they received (e.g.
+"+300 Points / +1 Shield / +1 Pass") before a second Continue click
+closes it. Still no Legacy Chest work, no asset transfer, no Player
+Departure integration. See the dedicated section below.

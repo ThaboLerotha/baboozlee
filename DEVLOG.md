@@ -3148,3 +3148,60 @@ Treasure-Chest/scoring-adjacent files.
 claimed resources in the live scoreboard — Node-level verification of
 player state and the correct calls being made, not a rendered-browser
 confirmation.
+
+## Entry 36 — Treasure Chests: Step 6 (reward result display)
+
+### What changed
+
+Re-read `continueEvent()`'s existing chest branch (Step 5) before
+writing anything. The task required both a visible result AND keeping
+Continue as the way to close the popup afterward — meaning claiming
+and closing could no longer happen in the same click the way Step 5
+left them, or the player would never actually see what they got.
+
+Added `renderRewardChestResult()`, which reads
+`GameNight.rewardChest.contents` live and writes a dynamic "+N Points
+/ +N Shield / +N Pass" line into the popup (omitting any zero-value
+field, so the text always matches exactly what's actually in the
+bundle, not a fixed three-line template). Changed `continueEvent()`'s
+chest branch to check `found` *before* calling `claimRewardChest()`:
+on the claiming click (`found` still `false`) it claims, renders the
+result, and returns without closing; on the next click (`found` now
+`true`) it just closes — identical to how reopening an already-claimed
+chest already behaved since Step 5. No new state was added to tell the
+two clicks apart; `found` already flips from `false` to `true` exactly
+once, on the claim itself, so it doubles as the distinguishing signal
+for free.
+
+### Not done in this entry (explicitly, per instruction)
+
+- No changes to chest contents generation, board placement, Score
+  logic, player structure, Legacy Chest, normal question/event
+  behavior, tile-used state, turn rotation, or the Threat Engine —
+  confirmed via `git diff --stat` on the other Treasure-Chest/scoring
+  files.
+- No new libraries, frameworks, files, or abstractions — one new
+  method in the existing file.
+- No second reward-awarding system — `claimRewardChest()` itself is
+  completely unchanged; this step only adds a rendering step around
+  it.
+
+### Verification performed
+
+18-part Node test (via `vm`, against the real `popup.js` and
+`score.js` together). Confirmed the first claim still awards exactly
+the existing contents; confirmed the displayed text is genuinely
+dynamic by using a deliberately non-default bundle and checking both
+that the new values appear and that the old default value does not;
+confirmed a zero-value field is correctly omitted; confirmed the popup
+stays open after the claiming click and closes on the next; confirmed
+a second click awards nothing further and doesn't alter the displayed
+result text; confirmed reopening an already-claimed chest still just
+closes safely; regression-confirmed a real Event tile's Continue and a
+normal Correct both still resolve exactly as before; confirmed exactly
+one file changed in the entire working tree with zero diff on the
+four other Treasure-Chest/scoring-adjacent files.
+
+**Could not verify:** actual browser rendering/visual layout of the
+result text — Node-level verification of the DOM stub's captured
+content, not a rendered-browser confirmation.

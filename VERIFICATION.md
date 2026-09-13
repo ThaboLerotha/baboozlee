@@ -1942,6 +1942,64 @@ rendered-browser confirmation.
 
 ---
 
+## VERIFIED — Treasure Chests, Step 6: reward result display (ui/popup.js)
+
+**Verified against commit:** `66baa9a`
+
+**Systems/files involved:** `ui/popup.js` only (58 additive lines — a
+new `renderRewardChestResult()` method plus a small change to
+`continueEvent()`'s chest branch: render-and-stay-open on the claiming
+click, close on the next). `game/board.js`, `engine/app.js`,
+`informationBoard.js`, `managers/score.js` all confirmed zero diff.
+
+**What was implemented:** `renderRewardChestResult()` reads
+`GameNight.rewardChest.contents` live and writes a dynamic "+N Points
+/ +N Shield / +N Pass" summary (omitting any zero-value field) into
+the popup. `continueEvent()`'s chest branch checks `found` *before*
+claiming: first click (`found` false) claims + renders + does not
+close; next click (`found` now true, the same flag that already
+prevented a repeat award since Step 5) just closes. No new state was
+introduced to distinguish the two clicks.
+
+**What was tested (18-part Node test against the real `popup.js` and
+`score.js` together, run through `vm`):**
+- First claim still awards exactly the existing points/shield/passes,
+  and `found` becomes `true`.
+- Result text reflects the *actual* contents dynamically — tested
+  with a deliberately non-default bundle (`{points:777, shield:1,
+  passes:2}`) and confirmed the popup shows "+777 Points"/"+2 Pass"
+  and explicitly does NOT contain the old default "+300 Points" —
+  proving the text isn't a hardcoded duplicate.
+- A zero-value field (`shield: 0`) is correctly omitted from the
+  displayed result.
+- The popup does not close after the first (claiming) click — the
+  player has a chance to read the result.
+- A second click on the same open popup: no further score/shield/
+  passes change, the popup then closes, and the result text is left
+  exactly as it was (not overwritten with something new/incorrect).
+- Reopening an already-claimed chest tile (`found: true` from a prior
+  session) and clicking Continue: closes immediately, no re-award.
+- Regression: a real (non-chest) Event tile's Continue still executes
+  its event and marks it used; a normal question tile's Correct still
+  resolves exactly as before.
+- `git diff --name-only` confirmed exactly one file in the entire
+  working tree was modified; `git diff --stat` confirmed zero diff on
+  the four other Treasure-Chest/scoring-adjacent files.
+
+**Would require rerun if:** `renderRewardChestResult()`'s field list
+changes, the `contents` bundle's field names change, or
+`continueEvent()`'s two-click structure changes.
+
+**Known, still-deferred (not a defect, per this step's explicit
+scope):** no Legacy Chest work, no Player Departure integration, no
+chest notifications, no new libraries/frameworks/abstractions.
+
+**Could not verify:** actual browser rendering/visual layout of the
+result text — this was Node-level verification of the DOM stub's
+captured `innerHTML`, not a rendered-browser confirmation.
+
+---
+
 ## Could not confidently establish
 
 - **Entry 1** — "Phase 1: EventExecutor implementation + Phase 2:

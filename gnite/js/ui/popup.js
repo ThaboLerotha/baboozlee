@@ -739,6 +739,52 @@ ${infoBlock}
 
     },
 
+    // Treasure Chests, Step 6: renders what was actually claimed,
+    // read live from GameNight.rewardChest.contents (never a
+    // hardcoded duplicate of the reward values) -- called once, right
+    // after claimRewardChest() sets found = true, so the player can
+    // see the result before closing. Only ever touches popupQuestion's
+    // content; button visibility is already correct from
+    // openRewardChest() and needs no change (Continue stays visible
+    // for the player to close the popup afterward).
+    renderRewardChestResult(){
+
+        const contents = GameNight.rewardChest.contents;
+
+        const lines = [];
+
+        if(contents.points){
+
+            lines.push(`+${contents.points} Points`);
+
+        }
+
+        if(contents.shield){
+
+            lines.push(`+${contents.shield} Shield`);
+
+        }
+
+        if(contents.passes){
+
+            lines.push(`+${contents.passes} Pass`);
+
+        }
+
+        document
+            .getElementById("popupQuestion")
+            .innerHTML = `
+
+<h2>🎁 REWARD CHEST</h2>
+
+<p>You claimed:</p>
+
+<p>${lines.join("<br>")}</p>
+
+`;
+
+    },
+
     // The dedicated resolve action for pure Event tiles. There was
     // never a question, so "Wrong" would be a misleading label and
     // function name -- this exists purely so the UI and the code both
@@ -759,6 +805,14 @@ ${infoBlock}
     // Step 5: claims the chest (see claimRewardChest() above) exactly
     // once -- an already-claimed chest (found already true) just
     // closes, behaving as already-claimed, never re-awarding.
+    //
+    // Step 6: the first click (found still false going in) claims,
+    // renders the result, and deliberately does NOT close yet -- the
+    // player needs a chance to actually read what they got. The next
+    // click (found now true) just closes, same as an already-claimed
+    // chest always has. No extra state was added to tell these two
+    // clicks apart -- found already does it, since it flips from
+    // false to true exactly once, on the claim itself.
     async continueEvent() {
 
         const tile = GameNight.board.find(
@@ -772,6 +826,10 @@ ${infoBlock}
             if(!GameNight.rewardChest.found){
 
                 this.claimRewardChest();
+
+                this.renderRewardChestResult();
+
+                return;
 
             }
 
